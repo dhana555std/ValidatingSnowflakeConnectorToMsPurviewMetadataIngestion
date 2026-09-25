@@ -1,0 +1,9 @@
+pytest==9.1.1
+pytest-html==4.2.0
+playwright==1.63.0
+pytest-playwright==0.9.0
+python-dotenv==1.2.3
+snowflake-connector-python==4.7.5
+azure-purview-catalog==1.0.0b4
+azure-identity==1.25.3
+requests==2.34.2

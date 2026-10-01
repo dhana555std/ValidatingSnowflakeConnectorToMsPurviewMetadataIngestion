@@ -1,18 +1,19 @@
 """Bidirectional column comparison: Snowflake ↔ MS Purview.
-
+ 
 Data is pre-extracted by the session fixture in conftest.py.
 Columns are stored per-schema under data/actual/columns/ and data/expected/columns/.
 """
-
+ 
 import os
-
+ 
 import pytest
-from utils.comparator import compare_columns, load_jsonl_dir, find_purview_columns_empty_description
-
+from utils.comparator import compare_columns, load_jsonl_dir
+ 
 _ACTUAL = "data/actual"
 _EXPECTED = "data/expected"
-
-
+_MAX_LISTED = 100   # how many offending columns to print in the failure message
+ 
+ 
 @pytest.mark.columns
 def test_all_snowflake_columns_exist_in_purview():
     """Every Snowflake column must have a corresponding asset in Purview."""
@@ -22,8 +23,8 @@ def test_all_snowflake_columns_exist_in_purview():
         + "\n".join(f"  • {k}" for k in missing[:100])
         + (f"\n  … and {len(missing) - 100} more" if len(missing) > 100 else "")
     )
-
-
+ 
+ 
 @pytest.mark.columns
 def test_no_extra_columns_in_purview():
     """Purview must not contain columns absent from Snowflake."""
@@ -33,24 +34,42 @@ def test_no_extra_columns_in_purview():
         + "\n".join(f"  • {k}" for k in extra[:100])
         + (f"\n  … and {len(extra) - 100} more" if len(extra) > 100 else "")
     )
-
-
+ 
+ 
 @pytest.mark.columns
 def test_purview_columns_have_descriptions():
-    """Report columns in Purview that are missing a description.
-
-    This test always passes — it is informational and surfaces the
-    count in the console. The HTML report shows the full tabular list.
+    """Every Purview column must have a non-empty description.
+ 
+    Passes only when ALL columns have a description.  A single column with a
+    missing, empty, or whitespace-only description fails the test.
     """
     pv_dir = os.path.join(_EXPECTED, "columns")
-    if not os.path.isdir(pv_dir):
-        pytest.skip("Purview column data not yet extracted")
-
-    empty = find_purview_columns_empty_description(_EXPECTED)
-    total = len(load_jsonl_dir(pv_dir))
-    pct = (len(empty) / total * 100) if total else 0
-    print(
-        f"\nPurview columns with empty description: {len(empty):,} / {total:,} ({pct:.1f}%)"
+ 
+    # No data means nothing was verified — that is a failure, not a pass.
+    assert os.path.isdir(pv_dir), (
+        f"Purview column data not found at '{pv_dir}' — extraction did not run, "
+        "so column descriptions could not be verified."
     )
-    # Non-blocking — surfaced in HTML report; remove the comment below to enforce
-    # assert not empty, f"{len(empty):,} Purview column(s) have no description"
+    records = load_jsonl_dir(pv_dir)
+    total = len(records)
+    assert total > 0, (
+        "No Purview columns were extracted — column descriptions could not be verified."
+    )
+ 
+    # Same rule as the HTML report: None, "" and whitespace-only all count as empty.
+    empty = [r for r in records if not (r.get("description") or "").strip()]
+    pct = len(empty) / total * 100
+    print(f"\nPurview columns with empty description: {len(empty):,} / {total:,} ({pct:.1f}%)")
+ 
+    def _key(r):
+        return ".".join(
+            str(r.get(k) or "?")
+            for k in ("database_name", "schema_name", "table_name", "name")
+        )
+ 
+    assert not empty, (
+        f"{len(empty):,} of {total:,} Purview column(s) ({pct:.1f}%) have no description:\n"
+        + "\n".join(f"  • {_key(r)}" for r in empty[:_MAX_LISTED])
+        + (f"\n  … and {len(empty) - _MAX_LISTED:,} more" if len(empty) > _MAX_LISTED else "")
+    )
+ 

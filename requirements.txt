@@ -7,3 +7,4 @@ snowflake-connector-python==4.7.5
 azure-purview-catalog==1.0.0b4
 azure-identity==1.25.3
 requests==2.34.2
+ruff==0.16.10

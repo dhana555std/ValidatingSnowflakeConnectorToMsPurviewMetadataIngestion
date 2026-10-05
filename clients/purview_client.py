@@ -213,14 +213,14 @@ class PurviewClient:
         return self._resolve_collection(self._collection_prod)
  
     def _collection_path(self, reference_name: str) -> str:
-        """Full friendly path from the root, e.g. 'Vantive US/Prod/Commercial'.
+        """Full friendly path from the root, e.g. 'Domain name US/Prod/Commercial'.
  
         Matches the "Collection path" panel in the Purview UI.  The Collections
         API only returns the parent's *reference* name, so the chain is walked
         through the cached collection list to get friendly names.
         """
         # Reference names are matched case-insensitively: Purview returns the root
-        # as "Vantive" but children point to it as "vantive".
+        # as "Domain name" but children point to it as "Domain name".
         col_by_name = {c["name"].lower(): c for c in self._list_collections()}
         parts: List[str] = []
         current = col_by_name.get(str(reference_name).lower())

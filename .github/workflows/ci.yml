@@ -17,51 +17,11 @@ env:
 
 jobs:
   # ────────────────────────────────────────────────────────────────────────────
-  # Job 1: Lint + test collection (no cloud credentials needed)
-  # ────────────────────────────────────────────────────────────────────────────
-  lint-and-collect:
-    name: Lint & Test Collection
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-          cache: pip
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      # - name: Lint with Ruff
-      #   run: |
-      #     pip install ruff
-      #     ruff check . --select E,W,F --ignore E501
-
-      - name: Verify test collection
-        env:
-          SNOWFLAKE_ACCOUNT: "dummy"
-          SNOWFLAKE_USER: "dummy"
-          SNOWFLAKE_PASSWORD: "dummy"
-          SNOWFLAKE_WAREHOUSE: "dummy"
-          PURVIEW_ACCOUNT_NAME: "dummy"
-          AZURE_TENANT_ID: "00000000-0000-0000-0000-000000000000"
-          AZURE_CLIENT_ID: "00000000-0000-0000-0000-000000000000"
-          AZURE_CLIENT_SECRET: "dummy"
-          DOMAIN_NAME: "dummy"
-          ENVIRONMENT: "Prod"
-        run: pytest --collect-only -q
-
-  # ────────────────────────────────────────────────────────────────────────────
-  # Job 2: Full integration tests
+  # Job 1: Full integration tests
   # ────────────────────────────────────────────────────────────────────────────
   integration-tests:
     name: Integration Tests (${{ github.event.inputs.environment }})
     runs-on: ubuntu-latest
-    needs: lint-and-collect
 
     steps:
       - name: Checkout
@@ -92,7 +52,7 @@ jobs:
           AZURE_CLIENT_ID:             ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET:         ${{ secrets.AZURE_CLIENT_SECRET }}
           DOMAIN_NAME:                 ${{ secrets.DOMAIN_NAME }}
-          ENVIRONMENT:                 ${{ github.event.inputs.environment }}
+          PURVIEW_COLLECTION:          ${{ github.event.inputs.environment }}
         run: pytest --timeout=900 || true
 
       - name: Upload report and data snapshot

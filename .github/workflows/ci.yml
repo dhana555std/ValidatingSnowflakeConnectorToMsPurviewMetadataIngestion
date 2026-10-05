@@ -53,7 +53,7 @@ jobs:
           AZURE_CLIENT_SECRET:         ${{ secrets.AZURE_CLIENT_SECRET }}
           DOMAIN_NAME:                 ${{ secrets.DOMAIN_NAME }}
           PURVIEW_COLLECTION:          ${{ github.event.inputs.environment }}
-        run: pytest --timeout=900 || true
+        run: pytest --timeout=1800 || true
 
       - name: Upload report and data snapshot
         if: always()

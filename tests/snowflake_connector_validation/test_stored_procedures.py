@@ -6,8 +6,10 @@ Data is pre-extracted by the session fixture in conftest.py.
 import pytest
 from utils.comparator import compare_stored_procedures
 
-_ACTUAL = "data/actual"
-_EXPECTED = "data/expected"
+from utils.paths import SNOWFLAKE_RESULTS_DIR, PURVIEW_RESULTS_DIR
+
+_ACTUAL   = SNOWFLAKE_RESULTS_DIR
+_EXPECTED = PURVIEW_RESULTS_DIR
 
 
 @pytest.mark.stored_procedures

@@ -1,8 +1,8 @@
 """
 refresh_report.py
 =================
-Regenerates reports/report.html from the JSONL files already on disk
-(data/actual/ and data/expected/) WITHOUT re-running extraction or tests.
+Regenerates reports/purview_snowflake_connector_report.html from the JSONL files already on disk
+(data/snowflake_connector_validation/snowflake_results/ and data/snowflake_connector_validation/purview_results/) WITHOUT re-running extraction or tests.
 
 Run from the project root:
     python scripts/refresh_report.py
@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv()
 
+from utils.paths import SNOWFLAKE_RESULTS_DIR, PURVIEW_RESULTS_DIR, REPORT_HTML, REPORT_JSON
 from utils.report_data_builder import build_report_data
 from utils.report_generator import generate_report
 
@@ -29,9 +30,9 @@ from utils.report_generator import generate_report
 def main() -> None:
     import json
 
-    actual_dir   = "data/actual"
-    expected_dir = "data/expected"
-    results_file = "reports/test_results.json"
+    actual_dir   = SNOWFLAKE_RESULTS_DIR
+    expected_dir = PURVIEW_RESULTS_DIR
+    results_file = REPORT_JSON
 
     # Verify data exists before proceeding
     missing_dirs = [d for d in (actual_dir, expected_dir) if not os.path.isdir(d)]
@@ -82,10 +83,9 @@ def main() -> None:
         status  = "OK" if (missing == 0 and extra == 0) else f"MISMATCH (missing={missing}, extra={extra})"
         print(f"  {entity:<20} SF={sf:>8,}  PV={pv:>8,}  {status}")
 
-    os.makedirs("reports", exist_ok=True)
-    out = "reports/report.html"
-    generate_report(report_data, out)
-    print(f"\nReport written to: {out}")
+    os.makedirs("reports/snowflake_connector_validation", exist_ok=True)
+    generate_report(report_data, REPORT_HTML)
+    print(f"\nReport written to: {REPORT_HTML}")
 
 
 if __name__ == "__main__":

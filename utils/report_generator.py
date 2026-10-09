@@ -565,7 +565,7 @@ def generate_report(data: dict, out_path: str) -> None:
     data:
         The ``_REPORT_DATA`` dict populated by conftest.py.
     out_path:
-        Destination file path (e.g. ``reports/report.html``).
+        Destination file path (e.g. ``reports/purview_snowflake_connector_report.html``).
     """
     env  = data.get("environment", "Prod")
     ts   = datetime.datetime.now().strftime("%d %b %Y, %H:%M:%S")

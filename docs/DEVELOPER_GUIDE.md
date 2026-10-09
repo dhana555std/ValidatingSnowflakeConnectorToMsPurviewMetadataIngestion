@@ -82,7 +82,7 @@ Copy `.env.example` to `.env` and fill in each value. **Never commit `.env`** â€
 ## Running Tests
 
 ```bash
-# Full suite (all tests, generates reports/report.html)
+# Full suite (all tests, generates reports/snowflake_connector_validation/report.html)
 pytest
 
 # Snowflake extraction only
@@ -107,7 +107,7 @@ pytest -x
 pytest -s
 ```
 
-The HTML report is always written to `reports/report.html`. Both `data/actual/` and `data/expected/` are **wiped at the start of every session** so you always get a clean run.
+The HTML report is always written to `reports/snowflake_connector_validation/report.html`. Both `data/snowflake_connector_validation/snowflake_data_validation/` and `data/snowflake_connector_validation/purview_data_validation/` are **wiped at the start of every session** so you always get a clean run.
 
 ---
 
@@ -120,7 +120,7 @@ The framework is designed to be extended. To add a new Snowflake entity (e.g. `s
 In `clients/snowflake_client.py`, add a method following the existing pattern:
 
 ```python
-def extract_all_stages(self, out_path: str = "data/actual/stages.jsonl") -> Dict[str, Any]:
+def extract_all_stages(self, out_path: str = "data/snowflake_connector_validation/snowflake_data_validation/stages.jsonl") -> Dict[str, Any]:
     return self._stream_to_jsonl(
         self._stream(f"""
             SELECT ...
@@ -143,7 +143,7 @@ _ENTITY_TYPES = {
     "stages": "snowflake_stage",
 }
 
-def extract_stages(self, out_path: str = "data/expected/purview_stages.jsonl") -> Dict[str, Any]:
+def extract_stages(self, out_path: str = "data/snowflake_connector_validation/purview_data_validation/purview_stages.jsonl") -> Dict[str, Any]:
     return self._stream_to_jsonl(self._search(_ENTITY_TYPES["stages"]), out_path)
 ```
 
@@ -199,7 +199,7 @@ Columns are fetched via the Atlas bulk entity API in batches of 20 GUIDs. Each r
 Purview columns are **not** indexed for the Catalog Search API. The framework resolves them through the Atlas `entity/bulk` endpoint using `referredEntities`. Verify:
 
 1. The Commercial collection reference resolved correctly (check the `[INFO]` log line).
-2. Tables were successfully extracted first (`data/expected/purview_tables.jsonl` exists and is non-empty).
+2. Tables were successfully extracted first (`data/snowflake_connector_validation/purview_data_validation/purview_tables.jsonl` exists and is non-empty).
 
 ### `ConnectionResetError` mid-run
 

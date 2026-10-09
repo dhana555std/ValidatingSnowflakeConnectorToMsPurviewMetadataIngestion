@@ -37,7 +37,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Create output directories
-        run: mkdir -p reports data/snowflake_results data/purview_snowflake_results
+        run: mkdir -p reports data/snowflake_connector_validation/snowflake_results data/snowflake_connector_validation/purview_results
 
       - name: Run full test suite
         env:
@@ -62,7 +62,7 @@ jobs:
           name: validation-results-${{ github.event.inputs.environment }}-${{ github.run_number }}
           path: |
             reports/purview_snowflake_connector_report.html
-            data/snowflake_results/
-            data/purview_snowflake_results/
+            data/snowflake_connector_validation/snowflake_results/
+            data/snowflake_connector_validation/purview_results/
           retention-days: 30
           if-no-files-found: ignore

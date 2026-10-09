@@ -1,7 +1,7 @@
 """Bidirectional column comparison: Snowflake ↔ MS Purview.
  
 Data is pre-extracted by the session fixture in conftest.py.
-Columns are stored per-schema under data/snowflake_results/columns/ and data/purview_snowflake_results/columns/.
+Columns are stored per-schema under data/snowflake_connector_validation/snowflake_results/columns/ and data/snowflake_connector_validation/purview_results/columns/.
 """
  
 import os

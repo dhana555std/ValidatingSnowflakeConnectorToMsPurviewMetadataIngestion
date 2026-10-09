@@ -33,11 +33,11 @@ A **browser-free Python test framework** that validates whether a Microsoft Purv
 │                                                                     │
 │  STEP 3  Extract from Snowflake ACCOUNT_USAGE (SQL = query.sql)     │
 │          databases · schemas · tables · views                       │
-│          columns · stored_procedures  →  data/actual/              │
+│          columns · stored_procedures  →  data/snowflake_connector_validation/snowflake_data_validation/              │
 │                                                                     │
 │  STEP 4  Extract from MS Purview Catalog + Atlas Entity API         │
 │          same 6 entity types; columns via referredEntities          │
-│          →  data/expected/                                          │
+│          →  data/snowflake_connector_validation/purview_data_validation/                                          │
 └──────────────────────────────────┬──────────────────────────────────┘
                                    │  data fully on disk
                                    ▼
@@ -55,7 +55,7 @@ A **browser-free Python test framework** that validates whether a Microsoft Purv
                                    │  session finish hook
                                    ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│           Tabbed HTML report  (reports/report.html)                 │
+│           Tabbed HTML report  (reports/snowflake_connector_validation/report.html)                 │
 │                                                                     │
 │  📊 Overview  |  🗄️ Databases  |  📂 Schemas  |  📋 Tables         │
 │  👁️ Views     |  🔠 Columns    |  ⚙️ Stored Procedures              │
@@ -79,7 +79,7 @@ The comparison is a **bidirectional set diff** performed for each of the six ent
 
 Each record from Snowflake and each record from Purview is reduced to a single, normalised string key. All keys are **uppercased** so comparison is case-insensitive.
 
-| Entity | Snowflake key (from `data/actual/`) | Purview key (parsed from `qualifiedName`) |
+| Entity | Snowflake key (from `data/snowflake_connector_validation/snowflake_data_validation/`) | Purview key (parsed from `qualifiedName`) |
 |--------|-------------------------------------|-------------------------------------------|
 | Database | `DATABASE_NAME` | `.../databases/<DB>` |
 | Schema | `DATABASE_NAME.SCHEMA_NAME` | `.../databases/<DB>/schemas/<SCHEMA>` |
@@ -325,7 +325,7 @@ Set `SNOWFLAKE_EXCLUDE_DATABASES` in `.env` to add further exclusions.
 
 ## HTML Report
 
-Open `reports/report.html` in any browser after a run.
+Open `reports/snowflake_connector_validation/report.html` in any browser after a run.
 
 **Overview tab** — stat cards (pass / fail / skip), extraction counts per entity, full test result list with duration and failure details.
 
@@ -365,9 +365,9 @@ The workflow runs two jobs in sequence:
 Each run uploads a single artifact named `validation-results-<env>-<run_number>` (retained 30 days) containing:
 
 ```
-reports/report.html      ← HTML validation report
-data/actual/             ← Snowflake JSONL snapshots
-data/expected/           ← Purview JSONL snapshots
+reports/snowflake_connector_validation/report.html      ← HTML validation report
+data/snowflake_connector_validation/snowflake_data_validation/             ← Snowflake JSONL snapshots
+data/snowflake_connector_validation/purview_data_validation/           ← Purview JSONL snapshots
 ```
 
 ### GitHub Secrets required
@@ -400,7 +400,7 @@ All SQL in `SnowflakeClient` mirrors `query.sql` exactly — same column selecti
 
 ### Per-schema column files
 
-Columns are written to `data/actual/columns/<DB>/<SCHEMA>.jsonl` and `data/expected/columns/<DB>/<SCHEMA>.jsonl`. This avoids creating single multi-GB files that would be impractical to open or diff.
+Columns are written to `data/snowflake_connector_validation/snowflake_data_validation/columns/<DB>/<SCHEMA>.jsonl` and `data/snowflake_connector_validation/purview_data_validation/columns/<DB>/<SCHEMA>.jsonl`. This avoids creating single multi-GB files that would be impractical to open or diff.
 
 ---
 

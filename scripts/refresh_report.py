@@ -2,7 +2,7 @@
 refresh_report.py
 =================
 Regenerates reports/purview_snowflake_connector_report.html from the JSONL files already on disk
-(data/snowflake_results/ and data/purview_snowflake_results/) WITHOUT re-running extraction or tests.
+(data/snowflake_connector_validation/snowflake_results/ and data/snowflake_connector_validation/purview_results/) WITHOUT re-running extraction or tests.
 
 Run from the project root:
     python scripts/refresh_report.py
@@ -83,7 +83,7 @@ def main() -> None:
         status  = "OK" if (missing == 0 and extra == 0) else f"MISMATCH (missing={missing}, extra={extra})"
         print(f"  {entity:<20} SF={sf:>8,}  PV={pv:>8,}  {status}")
 
-    os.makedirs("reports", exist_ok=True)
+    os.makedirs("reports/snowflake_connector_validation", exist_ok=True)
     generate_report(report_data, REPORT_HTML)
     print(f"\nReport written to: {REPORT_HTML}")
 

@@ -109,7 +109,7 @@ def clear_results():
             _log(f"[BeforeAll] Deleted {folder}/")
     os.makedirs(_ACTUAL_DIR, exist_ok=True)
     os.makedirs(_EXPECTED_DIR, exist_ok=True)
-    os.makedirs("reports", exist_ok=True)
+    os.makedirs("reports/snowflake_connector_validation", exist_ok=True)
     _log("[BeforeAll] Recreated data/ and reports/ directories.")
 
 
@@ -249,7 +249,7 @@ def pytest_sessionfinish(session, exitstatus):
         from utils.report_data_builder import build_report_data
         from utils.report_generator import generate_report
 
-        os.makedirs("reports", exist_ok=True)
+        os.makedirs("reports/snowflake_connector_validation", exist_ok=True)
 
         meta = {
             "environment":  _SESSION["environment"],

@@ -123,11 +123,11 @@ def build_report_data(
  
     # ── extraction counts (from JSONL files, not from runtime memory) ─────────
     sf_paths = {
-        "databases":         os.path.join(actual_dir, "databases.jsonl"),
-        "schemas":           os.path.join(actual_dir, "schemas.jsonl"),
-        "tables":            os.path.join(actual_dir, "tables.jsonl"),
-        "views":             os.path.join(actual_dir, "views.jsonl"),
-        "stored_procedures": os.path.join(actual_dir, "stored_procedures.jsonl"),
+        "databases":         os.path.join(actual_dir, "snowflake_databases.jsonl"),
+        "schemas":           os.path.join(actual_dir, "snowflake_schemas.jsonl"),
+        "tables":            os.path.join(actual_dir, "snowflake_tables.jsonl"),
+        "views":             os.path.join(actual_dir, "snowflake_views.jsonl"),
+        "stored_procedures": os.path.join(actual_dir, "snowflake_stored_procedures.jsonl"),
     }
     pv_paths = {
         "databases":         os.path.join(expected_dir, "purview_databases.jsonl"),

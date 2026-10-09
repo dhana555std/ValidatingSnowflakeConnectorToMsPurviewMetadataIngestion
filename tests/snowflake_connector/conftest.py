@@ -26,8 +26,8 @@ from clients.snowflake_client import SnowflakeClient
 
 load_dotenv()
 
-_ACTUAL_DIR             = "data/actual"
-_EXPECTED_DIR           = "data/expected"
+_ACTUAL_DIR             = "data/snowflake_results"
+_EXPECTED_DIR           = "data/purview_snowflake_results"
 _COLLECTION_REPORT_PATH = f"{_EXPECTED_DIR}/purview_collection_commercial.json"
 
 _SESSION: dict = {
@@ -97,12 +97,15 @@ def _create_purview_client() -> PurviewClient:
 
 @pytest.fixture(scope="session", autouse=True)
 def clear_results():
-    """Wipe data directories so stale files never pollute a run."""
-    for folder in (_ACTUAL_DIR, _EXPECTED_DIR):
+    """BeforeAll: delete data/ and reports/ entirely, then recreate them fresh."""
+    for folder in ("data", "reports"):
         if os.path.exists(folder):
             shutil.rmtree(folder)
-        os.makedirs(folder)
+            _log(f"[BeforeAll] Deleted {folder}/")
+    os.makedirs(_ACTUAL_DIR, exist_ok=True)
+    os.makedirs(_EXPECTED_DIR, exist_ok=True)
     os.makedirs("reports", exist_ok=True)
+    _log("[BeforeAll] Recreated data/ and reports/ directories.")
 
 
 @pytest.fixture(scope="package", autouse=True)
@@ -249,7 +252,7 @@ def pytest_sessionfinish(session, exitstatus):
             "end_time":     _SESSION["end_time"],
             "test_results": _SESSION["test_results"],
         }
-        with open("reports/test_results.json", "w", encoding="utf-8") as f:
+        with open("reports/purview_snowflake_connector_results.json", "w", encoding="utf-8") as f:
             json.dump(meta, f, indent=2)
 
         report_data = build_report_data(
@@ -258,8 +261,8 @@ def pytest_sessionfinish(session, exitstatus):
             start_time   = _SESSION["start_time"],
             end_time     = _SESSION["end_time"],
         )
-        generate_report(report_data, "reports/report.html")
-        print("\n\U0001f4ca  Report → reports/report.html")
+        generate_report(report_data, "reports/purview_snowflake_connector_report.html")
+        print("\n\U0001f4ca  Report → reports/purview_snowflake_connector_report.html")
     except Exception as exc:
         print(f"\n⚠️  Report generation failed: {exc}")
         traceback.print_exc()

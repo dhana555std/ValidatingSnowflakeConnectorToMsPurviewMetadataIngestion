@@ -166,7 +166,7 @@ class SnowflakeClient:
     # ── bulk extraction (matches query.sql exactly) ───────────────────────────
 
     def extract_all_databases(
-        self, out_path: str = "data/actual/databases.jsonl"
+        self, out_path: str = "data/snowflake_results/databases.jsonl"
     ) -> Dict[str, Any]:
         """
         -- query.sql section 1: DATABASES
@@ -194,7 +194,7 @@ class SnowflakeClient:
         )
 
     def extract_all_schemas(
-        self, out_path: str = "data/actual/schemas.jsonl"
+        self, out_path: str = "data/snowflake_results/schemas.jsonl"
     ) -> Dict[str, Any]:
         """
         -- query.sql section 2: SCHEMAS
@@ -222,7 +222,7 @@ class SnowflakeClient:
         )
 
     def extract_all_tables(
-        self, out_path: str = "data/actual/tables.jsonl"
+        self, out_path: str = "data/snowflake_results/tables.jsonl"
     ) -> Dict[str, Any]:
         """
         -- query.sql section 3: TABLES
@@ -255,7 +255,7 @@ class SnowflakeClient:
         )
 
     def extract_all_views(
-        self, out_path: str = "data/actual/views.jsonl"
+        self, out_path: str = "data/snowflake_results/views.jsonl"
     ) -> Dict[str, Any]:
         """
         -- query.sql section 4: VIEWS
@@ -284,7 +284,7 @@ class SnowflakeClient:
         )
 
     def extract_all_columns(
-        self, out_dir: str = "data/actual/columns"
+        self, out_dir: str = "data/snowflake_results/columns"
     ) -> Dict[str, Any]:
         """
         -- query.sql section 5: COLUMNS
@@ -322,7 +322,7 @@ class SnowflakeClient:
         )
 
     def extract_all_stored_procedures(
-        self, out_path: str = "data/actual/stored_procedures.jsonl"
+        self, out_path: str = "data/snowflake_results/stored_procedures.jsonl"
     ) -> Dict[str, Any]:
         """
         -- query.sql section 6: STORED PROCEDURES

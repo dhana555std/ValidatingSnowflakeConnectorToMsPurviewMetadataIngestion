@@ -7,11 +7,11 @@ Exports
 -------
 SnowflakeClient
     Streams metadata from Snowflake ``ACCOUNT_USAGE`` views and writes
-    the results as JSONL files under ``data/actual/``.
+    the results as JSONL files under ``data/snowflake_results/``.
 
 PurviewClient
     Fetches metadata from the MS Purview Catalog Search API and Atlas
-    Entity API, writing results as JSONL files under ``data/expected/``.
+    Entity API, writing results as JSONL files under ``data/purview_snowflake_results/``.
 """
 
 from .purview_client import PurviewClient

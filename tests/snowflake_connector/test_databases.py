@@ -7,8 +7,8 @@ These tests load JSONL files and assert set equality between both sources.
 import pytest
 from utils.comparator import compare_databases
 
-_ACTUAL = "data/actual"
-_EXPECTED = "data/expected"
+_ACTUAL = "data/snowflake_results"
+_EXPECTED = "data/purview_snowflake_results"
 
 
 @pytest.mark.databases

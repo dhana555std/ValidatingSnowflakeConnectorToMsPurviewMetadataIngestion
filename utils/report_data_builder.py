@@ -18,8 +18,8 @@ from typing import Any, Dict, List
  
 from utils import comparator as cmp
  
-_ACTUAL_DIR   = "data/actual"
-_EXPECTED_DIR = "data/expected"
+_ACTUAL_DIR   = "data/snowflake_results"
+_EXPECTED_DIR = "data/purview_snowflake_results"
 _COLLECTION_FILE = "purview_collection_commercial.json"
  
 # Display order in the report — anything else sorts after these, alphabetically

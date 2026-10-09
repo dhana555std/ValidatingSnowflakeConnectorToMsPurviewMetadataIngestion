@@ -1,8 +1,8 @@
 """
 refresh_report.py
 =================
-Regenerates reports/report.html from the JSONL files already on disk
-(data/actual/ and data/expected/) WITHOUT re-running extraction or tests.
+Regenerates reports/purview_snowflake_connector_report.html from the JSONL files already on disk
+(data/snowflake_results/ and data/purview_snowflake_results/) WITHOUT re-running extraction or tests.
 
 Run from the project root:
     python scripts/refresh_report.py
@@ -29,9 +29,9 @@ from utils.report_generator import generate_report
 def main() -> None:
     import json
 
-    actual_dir   = "data/actual"
-    expected_dir = "data/expected"
-    results_file = "reports/test_results.json"
+    actual_dir   = "data/snowflake_results"
+    expected_dir = "data/purview_snowflake_results"
+    results_file = "reports/purview_snowflake_connector_results.json"
 
     # Verify data exists before proceeding
     missing_dirs = [d for d in (actual_dir, expected_dir) if not os.path.isdir(d)]
@@ -83,7 +83,7 @@ def main() -> None:
         print(f"  {entity:<20} SF={sf:>8,}  PV={pv:>8,}  {status}")
 
     os.makedirs("reports", exist_ok=True)
-    out = "reports/report.html"
+    out = "reports/purview_snowflake_connector_report.html"
     generate_report(report_data, out)
     print(f"\nReport written to: {out}")
 

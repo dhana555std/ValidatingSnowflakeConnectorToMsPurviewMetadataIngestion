@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 load_dotenv()
 
+from utils.paths import SNOWFLAKE_RESULTS_DIR, PURVIEW_RESULTS_DIR, REPORT_HTML, REPORT_JSON
 from utils.report_data_builder import build_report_data
 from utils.report_generator import generate_report
 
@@ -29,9 +30,9 @@ from utils.report_generator import generate_report
 def main() -> None:
     import json
 
-    actual_dir   = "data/snowflake_results"
-    expected_dir = "data/purview_snowflake_results"
-    results_file = "reports/purview_snowflake_connector_results.json"
+    actual_dir   = SNOWFLAKE_RESULTS_DIR
+    expected_dir = PURVIEW_RESULTS_DIR
+    results_file = REPORT_JSON
 
     # Verify data exists before proceeding
     missing_dirs = [d for d in (actual_dir, expected_dir) if not os.path.isdir(d)]
@@ -83,9 +84,8 @@ def main() -> None:
         print(f"  {entity:<20} SF={sf:>8,}  PV={pv:>8,}  {status}")
 
     os.makedirs("reports", exist_ok=True)
-    out = "reports/purview_snowflake_connector_report.html"
-    generate_report(report_data, out)
-    print(f"\nReport written to: {out}")
+    generate_report(report_data, REPORT_HTML)
+    print(f"\nReport written to: {REPORT_HTML}")
 
 
 if __name__ == "__main__":

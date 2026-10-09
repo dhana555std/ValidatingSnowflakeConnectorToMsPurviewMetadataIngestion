@@ -26,9 +26,14 @@ from clients.snowflake_client import SnowflakeClient
 
 load_dotenv()
 
-_ACTUAL_DIR             = "data/snowflake_results"
-_EXPECTED_DIR           = "data/purview_snowflake_results"
-_COLLECTION_REPORT_PATH = f"{_EXPECTED_DIR}/purview_collection_commercial.json"
+from utils.paths import (
+    SNOWFLAKE_RESULTS_DIR, PURVIEW_RESULTS_DIR,
+    PV_COLLECTION_PATH, REPORT_HTML, REPORT_JSON,
+)
+
+_ACTUAL_DIR             = SNOWFLAKE_RESULTS_DIR
+_EXPECTED_DIR           = PURVIEW_RESULTS_DIR
+_COLLECTION_REPORT_PATH = PV_COLLECTION_PATH
 
 _SESSION: dict = {
     "environment":  os.environ.get("ENVIRONMENT", "Prod"),
@@ -252,7 +257,7 @@ def pytest_sessionfinish(session, exitstatus):
             "end_time":     _SESSION["end_time"],
             "test_results": _SESSION["test_results"],
         }
-        with open("reports/purview_snowflake_connector_results.json", "w", encoding="utf-8") as f:
+        with open(REPORT_JSON, "w", encoding="utf-8") as f:
             json.dump(meta, f, indent=2)
 
         report_data = build_report_data(
@@ -261,7 +266,7 @@ def pytest_sessionfinish(session, exitstatus):
             start_time   = _SESSION["start_time"],
             end_time     = _SESSION["end_time"],
         )
-        generate_report(report_data, "reports/purview_snowflake_connector_report.html")
+        generate_report(report_data, REPORT_HTML)
         print("\n\U0001f4ca  Report → reports/purview_snowflake_connector_report.html")
     except Exception as exc:
         print(f"\n⚠️  Report generation failed: {exc}")

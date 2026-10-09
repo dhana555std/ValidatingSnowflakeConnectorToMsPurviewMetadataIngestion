@@ -30,6 +30,11 @@ from typing import Any, Dict, Generator, List, Optional
 import snowflake.connector
 from snowflake.connector import DictCursor
 
+from utils.paths import (
+    SF_DATABASES_PATH, SF_SCHEMAS_PATH, SF_TABLES_PATH,
+    SF_VIEWS_PATH, SF_COLUMNS_DIR, SF_STORED_PROCEDURES_PATH,
+)
+
 logger = logging.getLogger(__name__)
 
 _BATCH_SIZE = 5_000
@@ -166,7 +171,7 @@ class SnowflakeClient:
     # ── bulk extraction (matches query.sql exactly) ───────────────────────────
 
     def extract_all_databases(
-        self, out_path: str = "data/snowflake_results/databases.jsonl"
+        self, out_path: str = SF_DATABASES_PATH
     ) -> Dict[str, Any]:
         """
         -- query.sql section 1: DATABASES
@@ -194,7 +199,7 @@ class SnowflakeClient:
         )
 
     def extract_all_schemas(
-        self, out_path: str = "data/snowflake_results/schemas.jsonl"
+        self, out_path: str = SF_SCHEMAS_PATH
     ) -> Dict[str, Any]:
         """
         -- query.sql section 2: SCHEMAS
@@ -222,7 +227,7 @@ class SnowflakeClient:
         )
 
     def extract_all_tables(
-        self, out_path: str = "data/snowflake_results/tables.jsonl"
+        self, out_path: str = SF_TABLES_PATH
     ) -> Dict[str, Any]:
         """
         -- query.sql section 3: TABLES
@@ -255,7 +260,7 @@ class SnowflakeClient:
         )
 
     def extract_all_views(
-        self, out_path: str = "data/snowflake_results/views.jsonl"
+        self, out_path: str = SF_VIEWS_PATH
     ) -> Dict[str, Any]:
         """
         -- query.sql section 4: VIEWS
@@ -284,7 +289,7 @@ class SnowflakeClient:
         )
 
     def extract_all_columns(
-        self, out_dir: str = "data/snowflake_results/columns"
+        self, out_dir: str = SF_COLUMNS_DIR
     ) -> Dict[str, Any]:
         """
         -- query.sql section 5: COLUMNS
@@ -322,7 +327,7 @@ class SnowflakeClient:
         )
 
     def extract_all_stored_procedures(
-        self, out_path: str = "data/snowflake_results/stored_procedures.jsonl"
+        self, out_path: str = SF_STORED_PROCEDURES_PATH
     ) -> Dict[str, Any]:
         """
         -- query.sql section 6: STORED PROCEDURES

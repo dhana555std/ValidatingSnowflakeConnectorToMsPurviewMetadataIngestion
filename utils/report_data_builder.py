@@ -17,9 +17,10 @@ import json
 from typing import Any, Dict, List
  
 from utils import comparator as cmp
- 
-_ACTUAL_DIR   = "data/snowflake_results"
-_EXPECTED_DIR = "data/purview_snowflake_results"
+from utils.paths import SNOWFLAKE_RESULTS_DIR, PURVIEW_RESULTS_DIR
+
+_ACTUAL_DIR      = SNOWFLAKE_RESULTS_DIR
+_EXPECTED_DIR    = PURVIEW_RESULTS_DIR
 _COLLECTION_FILE = "purview_collection_commercial.json"
  
 # Display order in the report — anything else sorts after these, alphabetically

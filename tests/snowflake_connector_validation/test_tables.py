@@ -6,8 +6,10 @@ Data is pre-extracted by the session fixture in conftest.py.
 import pytest
 from utils.comparator import compare_tables
 
-_ACTUAL = "data/snowflake_results"
-_EXPECTED = "data/purview_snowflake_results"
+from utils.paths import SNOWFLAKE_RESULTS_DIR, PURVIEW_RESULTS_DIR
+
+_ACTUAL   = SNOWFLAKE_RESULTS_DIR
+_EXPECTED = PURVIEW_RESULTS_DIR
 
 
 @pytest.mark.tables

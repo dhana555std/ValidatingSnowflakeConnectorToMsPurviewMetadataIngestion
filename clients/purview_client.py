@@ -45,6 +45,11 @@ from typing import Any, Dict, Generator, Iterable, List, Optional
 import requests
 from azure.identity import ClientSecretCredential
 from azure.purview.catalog import PurviewCatalogClient
+
+from utils.paths import (
+    PV_COLLECTION_PATH, PV_DATABASES_PATH, PV_SCHEMAS_PATH,
+    PV_TABLES_PATH, PV_VIEWS_PATH, PV_COLUMNS_DIR, PV_STORED_PROCEDURES_PATH,
+)
  
 logger = logging.getLogger(__name__)
  
@@ -291,7 +296,7 @@ class PurviewClient:
     def extract_collection_report(
         self,
         environments: Iterable[str] = ("Prod", "NonProd"),
-        out_path: str = "data/purview_snowflake_results/purview_collection_commercial.json",
+        out_path: str = PV_COLLECTION_PATH,
     ) -> Dict[str, Any]:
         """Metadata + asset counts for Commercial under each environment, in one file.
  
@@ -433,27 +438,27 @@ class PurviewClient:
     # ── extraction methods ─────────────────────────────────────────
  
     def extract_databases(
-        self, out_path: str = "data/purview_snowflake_results/purview_databases.jsonl"
+        self, out_path: str = PV_DATABASES_PATH
     ) -> Dict[str, Any]:
         return self._stream_to_jsonl(self._search(_ENTITY_TYPES["databases"]), out_path)
  
     def extract_schemas(
-        self, out_path: str = "data/purview_snowflake_results/purview_schemas.jsonl"
+        self, out_path: str = PV_SCHEMAS_PATH
     ) -> Dict[str, Any]:
         return self._stream_to_jsonl(self._search(_ENTITY_TYPES["schemas"]), out_path)
  
     def extract_tables(
-        self, out_path: str = "data/purview_snowflake_results/purview_tables.jsonl"
+        self, out_path: str = PV_TABLES_PATH
     ) -> Dict[str, Any]:
         return self._stream_to_jsonl(self._search(_ENTITY_TYPES["tables"]), out_path)
  
     def extract_views(
-        self, out_path: str = "data/purview_snowflake_results/purview_views.jsonl"
+        self, out_path: str = PV_VIEWS_PATH
     ) -> Dict[str, Any]:
         return self._stream_to_jsonl(self._search(_ENTITY_TYPES["views"]), out_path)
  
     def extract_columns(
-        self, out_dir: str = "data/purview_snowflake_results/columns"
+        self, out_dir: str = PV_COLUMNS_DIR
     ) -> Dict[str, Any]:
         # Columns are not indexed for search; they live inside table/view entities.
         # Collect all table + view GUIDs, then bulk-fetch their referredEntities.
@@ -509,7 +514,7 @@ class PurviewClient:
         return {"count": count, "fields": fields, "sample": sample, "output_dir": out_dir}
  
     def extract_stored_procedures(
-        self, out_path: str = "data/purview_snowflake_results/purview_stored_procedures.jsonl"
+        self, out_path: str = PV_STORED_PROCEDURES_PATH
     ) -> Dict[str, Any]:
         return self._stream_to_jsonl(
             self._search(_ENTITY_TYPES["stored_procedures"]), out_path

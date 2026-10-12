@@ -8,9 +8,11 @@ Modules
 comparator
     Set-diff engine: loads JSONL snapshots from both sources and computes
     which objects are missing from or extra in Purview.
-html_extras
-    Styled HTML fragment builders that are embedded into pytest-html test
-    results via the ``extra`` fixture.
+report_renderer
+    Renders a validation's HTML report from the templates, CSS and JS in
+    ``report_ui/`` (shared branding + per-validation pages).
+report_generator
+    Shapes the Snowflake connector validation data for its report templates.
 reporter
     Console-based extraction summary printer.
 file_helper

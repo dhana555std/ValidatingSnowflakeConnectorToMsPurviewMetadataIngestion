@@ -82,7 +82,7 @@ Copy `.env.example` to `.env` and fill in each value. **Never commit `.env`** â€
 ## Running Tests
 
 ```bash
-# Full suite (all tests, generates reports/snowflake_connector_validation/report.html)
+# Full suite (all tests, generates reports/snowflake_connector_validation/index.html)
 pytest
 
 # Snowflake extraction only
@@ -107,7 +107,7 @@ pytest -x
 pytest -s
 ```
 
-The HTML report is always written to `reports/snowflake_connector_validation/report.html`. Both `data/snowflake_connector_validation/snowflake_data_validation/` and `data/snowflake_connector_validation/purview_data_validation/` are **wiped at the start of every session** so you always get a clean run.
+The HTML report is always written to `reports/snowflake_connector_validation/index.html` (shared css/js in `reports/assets/`). Both `data/snowflake_connector_validation/snowflake_data_validation/` and `data/snowflake_connector_validation/purview_data_validation/` are **wiped at the start of every session** so you always get a clean run.
 
 ---
 

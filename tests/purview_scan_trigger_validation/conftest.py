@@ -10,8 +10,8 @@ Execution order
                            run history, then validates the runs against expected_schedule.csv
                            (package-scoped; aborts the session if Purview fails)
 3. Tests run             — pure assertions on the JSONL written in step 2, no cloud calls
-4. pytest_sessionfinish  — writes scan_report.html, scan_report / validation_report (CSV + JSONL)
-                           and test_results.json
+4. pytest_sessionfinish  — writes index.html (reports/<validation>/), plus scan_report /
+                           validation_report (CSV + JSONL) and test_results.json under its data/
  
 Settings (.env)
 ---------------
@@ -36,11 +36,13 @@ from dotenv import load_dotenv
 from .purview_scan_client import PurviewScanClient
 from . import scan_report_builder as srb
 from . import scan_validator as sv
+from utils.paths import PURVIEW_SCAN_DATA_DIR, PURVIEW_SCAN_REPORT_DIR
  
 load_dotenv()
  
-DATA_DIR = "data/purview_scan_trigger_validation"
-REPORT_DIR = "reports/purview_scan_trigger_validation"
+DATA_DIR = PURVIEW_SCAN_DATA_DIR
+REPORT_DIR = PURVIEW_SCAN_REPORT_DIR
+REPORT_DATA_DIR = f"{REPORT_DIR}/data"     # CSV / JSONL / JSON copies of the report data
 SCAN_RUNS_JSONL = f"{DATA_DIR}/purview_scan_runs.jsonl"
 VALIDATION_JSONL = f"{DATA_DIR}/validation_results.jsonl"
 HISTORY_DAYS = int(os.environ.get("SCAN_HISTORY_DAYS", "30"))
@@ -236,24 +238,24 @@ def pytest_sessionfinish(session, exitstatus):
         return
     _SESSION["end_time"] = time.time()
     try:
-        os.makedirs(REPORT_DIR, exist_ok=True)
+        os.makedirs(REPORT_DATA_DIR, exist_ok=True)
         cols, rows = _SESSION["scan_report"]
-        _write_csv(f"{REPORT_DIR}/scan_report.csv", cols, rows)
-        _write_jsonl(f"{REPORT_DIR}/scan_report.jsonl", cols, rows)
-        with open(f"{REPORT_DIR}/test_results.json", "w", encoding="utf-8") as f:
+        _write_csv(f"{REPORT_DATA_DIR}/scan_report.csv", cols, rows)
+        _write_jsonl(f"{REPORT_DATA_DIR}/scan_report.jsonl", cols, rows)
+        with open(f"{REPORT_DATA_DIR}/test_results.json", "w", encoding="utf-8") as f:
             json.dump({k: _SESSION[k] for k in ("environment", "start_time", "end_time", "test_results")},
                       f, indent=2)
         validation_rows = None
         if _SESSION["validation"]:
             vcols, validation_rows = _SESSION["validation"]
-            _write_csv(f"{REPORT_DIR}/validation_report.csv", vcols, validation_rows)
-            _write_jsonl(f"{REPORT_DIR}/validation_report.jsonl", vcols, validation_rows)
-        srb.write_html_report(
-            f"{REPORT_DIR}/scan_report.html", rows, HISTORY_DAYS,
+            _write_csv(f"{REPORT_DATA_DIR}/validation_report.csv", vcols, validation_rows)
+            _write_jsonl(f"{REPORT_DATA_DIR}/validation_report.jsonl", vcols, validation_rows)
+        report_path = srb.write_html_report(
+            rows, HISTORY_DAYS,
             meta={**_SESSION, "account": os.environ.get("PURVIEW_ACCOUNT_NAME", "")},
             validation=validation_rows,
         )
-        print(f"\n\U0001f4ca  Scan trigger report → {REPORT_DIR}/scan_report.html")
+        print(f"\n\U0001f4ca  Scan trigger report → {report_path}")
     except Exception as exc:
         print(f"\n⚠️  Scan trigger report generation failed: {exc}")
  

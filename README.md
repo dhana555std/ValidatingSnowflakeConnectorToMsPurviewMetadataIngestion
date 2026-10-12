@@ -17,6 +17,7 @@ A **browser-free Python test framework** that validates whether a Microsoft Purv
 - [Quick Start](#quick-start)
 - [Database Exclusions](#database-exclusions)
 - [HTML Report](#html-report)
+- [Report Generation Architecture](#report-generation-architecture)
 - [CI/CD](#cicd)
 - [Developer Notes](#developer-notes)
 
@@ -55,7 +56,7 @@ A **browser-free Python test framework** that validates whether a Microsoft Purv
                                    │  session finish hook
                                    ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│           Tabbed HTML report  (reports/snowflake_connector_validation/report.html)                 │
+│           Tabbed HTML report  (reports/snowflake_connector_validation/index.html)                  │
 │                                                                     │
 │  📊 Overview  |  🗄️ Databases  |  📂 Schemas  |  📋 Tables         │
 │  👁️ Views     |  🔠 Columns    |  ⚙️ Stored Procedures              │
@@ -220,14 +221,21 @@ purview-snowflake-validator/
 ├── utils/
 │   ├── comparator.py             # Key extractors, diff_sets(), compare_*()
 │   ├── report_data_builder.py    # Reads JSONL files → builds report data dict
-│   └── report_generator.py       # Renders self-contained tabbed HTML report
+│   ├── report_generator.py       # Shapes connector report data for its templates
+│   └── report_renderer.py        # Jinja2 renderer: report_ui/ → reports/<validation>/index.html
+├── report_ui/                    # All HTML / CSS / JS for reports (no markup in Python)
+│   ├── shared/                   # Common branding: css/base.css, js/report.js, templates/base.html, _macros.html
+│   ├── snowflake_connector_validation/   # templates/index.html + css/report.css
+│   └── purview_scan_trigger_validation/  # templates/index.html + css/report.css
 ├── scripts/
 │   └── refresh_report.py         # Regenerate report from existing JSONL (no re-extract)
 ├── data/
 │   ├── actual/                   # Snowflake JSONL (written by BeforeAll hook)
 │   └── expected/                 # Purview JSONL  (written by BeforeAll hook)
-├── reports/
-│   └── report.html               # Generated after each run
+├── reports/                      # Generated after each run (git-ignored)
+│   ├── assets/                   # Shared css/js copied from report_ui/shared — one copy for all reports
+│   ├── snowflake_connector_validation/   # index.html, css/, data/
+│   └── purview_scan_trigger_validation/  # index.html, css/, data/
 ├── docs/
 │   ├── ARCHITECTURE.md
 │   └── DEVELOPER_GUIDE.md
@@ -325,7 +333,7 @@ Set `SNOWFLAKE_EXCLUDE_DATABASES` in `.env` to add further exclusions.
 
 ## HTML Report
 
-Open `reports/snowflake_connector_validation/report.html` in any browser after a run.
+Open `reports/<validation>/index.html` (e.g. `reports/snowflake_connector_validation/index.html`) in any browser after a run. Each report is a folder — keep it together with `reports/assets/` when sharing (zip the `reports/` folder).
 
 **Overview tab** — stat cards (pass / fail / skip), extraction counts per entity, full test result list with duration and failure details.
 
@@ -339,7 +347,70 @@ Each tab shows a status banner with counts, then three collapsible sections (all
 | ▶ In Purview — NOT in Snowflake | Stale / orphaned assets in Purview |
 | ▶ Empty Description in Purview | Data quality audit — assets with no description |
 
-Tables with many rows are paginated at 50 rows per page with Prev / Next buttons. Tabs with mismatches are marked with a red dot.
+Tables scroll inside their section (headers stay pinned). Tabs with mismatches are marked with a red dot.
+
+---
+
+## Report Generation Architecture
+
+Each test category (`snowflake_connector_validation`, `purview_scan_trigger_validation`, …) produces its own report folder. No HTML, CSS or JavaScript lives in Python: Python prepares data, Jinja2 templates define the markup, and CSS/JS files define the look and behaviour.
+
+![Report generation architecture](docs/assets/report-generation.svg)
+
+### Who owns what
+
+| Concern | Lives in | Rule |
+|---------|----------|------|
+| **What to show** (counts, rows, pass/fail, badge colour names) | Python — `utils/report_generator.py`, `tests/<validation>/scan_report_builder.py` | Return a plain dict (`build_context`). No markup, no escaping, no styling. |
+| **How it is rendered** (copy assets, load templates, write files) | Python — `utils/report_renderer.py` | Generic; knows nothing about a specific report. |
+| **Page structure** | Jinja2 templates — `report_ui/shared/templates/base.html`, `_macros.html`, `report_ui/<validation>/templates/index.html` | Loops, conditions and layout only; no business logic. |
+| **Branding / look** | `report_ui/shared/css/base.css` | Colours are CSS variables (`--navy`, `--accent`, …); changing them restyles every report. |
+| **Report-specific look** | `report_ui/<validation>/css/report.css` | Only what differs from the shared styling. |
+| **Behaviour** | `report_ui/shared/js/report.js` | Tab switching and row filtering, wired by `data-*` attributes — no inline handlers. |
+
+### How a report is generated
+
+1. At session finish, the validation's `conftest.py` calls its builder (`generate_report(data)` for the connector, `write_html_report(rows, days, meta, validation)` for scan triggers).
+2. The builder turns raw results into a **context dict**: title, tab list, stat cards (`{"label", "value", "cls"}`), and tables built with `table_spec(headers, rows, ...)`. A cell that should be a coloured badge is `badge(text, "ok" | "warn" | "bad" | "mute")`.
+3. `render_report("<validation>", context, data)` in `utils/report_renderer.py`:
+   - copies `report_ui/shared/{css,js,img}` → `reports/assets/` (shared by every report);
+   - copies `report_ui/<validation>/{css,js,img}` → `reports/<validation>/`;
+   - creates a Jinja2 `Environment` whose loader searches `report_ui/<validation>/templates` first, then `report_ui/shared/templates` — so a validation can override any shared template;
+   - renders `index.html` and writes it plus `data/report.json` (the data the report was built from).
+4. The generated `index.html` links `../assets/css/base.css`, `../assets/js/report.js` and its own `css/report.css` by relative path, so the folder works from disk (`file://`) with no server.
+
+### Jinja2 details
+
+- **Inheritance.** `base.html` defines the header, tab bar, footer and script tags. A report's `index.html` does `{% extends "base.html" %}` and fills the blocks `title`, `logo`, `header_meta`, `panes`, `footer`.
+- **Macros** in `_macros.html` are the reusable components: `table(spec)`, `collapsible(title, count, cls, open)` (used with `{% call %}`), and `stat_cards(cards)`.
+- **Safe by default.** Autoescape is on, so scan names, error messages and object keys cannot inject HTML. `StrictUndefined` makes a misspelled variable raise an error instead of silently rendering blank.
+- **Filters.** `|num` formats counts with thousands separators.
+
+### Files involved
+
+```
+utils/report_renderer.py                          render_report(), table_spec(), badge()
+utils/report_generator.py                         connector report → context dict
+tests/purview_scan_trigger_validation/
+    scan_report_builder.py                        scan trigger report → context dict
+utils/paths.py                                    REPORT_UI_DIR, REPORTS_ROOT, per-validation dirs
+report_ui/shared/css/base.css                     brand + common components
+report_ui/shared/js/report.js                     tabs + filter
+report_ui/shared/templates/base.html, _macros.html
+report_ui/<validation>/templates/index.html       page for that category
+report_ui/<validation>/css/report.css             category-specific styling
+reports/assets/                                   generated: shared css/js
+reports/<validation>/index.html                   generated: the report (+ css/, data/)
+```
+
+### Adding a report for a new test category
+
+1. Create `report_ui/<validation>/templates/index.html` (extend `base.html`, import the macros) and `css/report.css`; add a `_logo.svg` if you want a custom mark.
+2. Write a `build_context(...)` in the validation's package that returns the context dict (`title`, `subtitle`, `tabs`, plus whatever your template reads).
+3. Call `render_report("<validation>", context, data=...)` from the validation's session-finish hook. Add path constants to `utils/paths.py`.
+4. Do not edit `base.css` unless the change should apply to every report.
+
+To preview template or CSS changes for the connector report without re-running extraction: `python scripts/refresh_report.py`.
 
 ---
 
@@ -365,7 +436,7 @@ The workflow runs two jobs in sequence:
 Each run uploads a single artifact named `validation-results-<env>-<run_number>` (retained 30 days) containing:
 
 ```
-reports/snowflake_connector_validation/report.html      ← HTML validation report
+reports/snowflake_connector_validation/index.html       ← HTML validation report
 data/snowflake_connector_validation/snowflake_data_validation/             ← Snowflake JSONL snapshots
 data/snowflake_connector_validation/purview_data_validation/           ← Purview JSONL snapshots
 ```

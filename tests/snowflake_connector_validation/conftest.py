@@ -28,7 +28,7 @@ load_dotenv()
 
 from utils.paths import (
     SNOWFLAKE_RESULTS_DIR, PURVIEW_RESULTS_DIR,
-    PV_COLLECTION_PATH, REPORT_HTML, REPORT_JSON,
+    PV_COLLECTION_PATH, REPORT_JSON, SNOWFLAKE_DATA_DIR, SNOWFLAKE_REPORT_DIR,
 )
 
 _ACTUAL_DIR             = SNOWFLAKE_RESULTS_DIR
@@ -102,15 +102,15 @@ def _create_purview_client() -> PurviewClient:
 
 @pytest.fixture(scope="session", autouse=True)
 def clear_results():
-    """BeforeAll: delete data/ and reports/ entirely, then recreate them fresh."""
-    for folder in ("data", "reports"):
+    """BeforeAll: wipe only this validation's data and report folders, then recreate them."""
+    for folder in (SNOWFLAKE_DATA_DIR, SNOWFLAKE_REPORT_DIR):
         if os.path.exists(folder):
             shutil.rmtree(folder)
             _log(f"[BeforeAll] Deleted {folder}/")
     os.makedirs(_ACTUAL_DIR, exist_ok=True)
     os.makedirs(_EXPECTED_DIR, exist_ok=True)
-    os.makedirs("reports/snowflake_connector_validation", exist_ok=True)
-    _log("[BeforeAll] Recreated data/ and reports/ directories.")
+    os.makedirs(SNOWFLAKE_REPORT_DIR, exist_ok=True)
+    _log(f"[BeforeAll] Recreated {SNOWFLAKE_DATA_DIR}/ and {SNOWFLAKE_REPORT_DIR}/.")
 
 
 @pytest.fixture(scope="package", autouse=True)
@@ -249,7 +249,7 @@ def pytest_sessionfinish(session, exitstatus):
         from utils.report_data_builder import build_report_data
         from utils.report_generator import generate_report
 
-        os.makedirs("reports/snowflake_connector_validation", exist_ok=True)
+        os.makedirs(os.path.dirname(REPORT_JSON), exist_ok=True)
 
         meta = {
             "environment":  _SESSION["environment"],
@@ -266,8 +266,8 @@ def pytest_sessionfinish(session, exitstatus):
             start_time   = _SESSION["start_time"],
             end_time     = _SESSION["end_time"],
         )
-        generate_report(report_data, REPORT_HTML)
-        print("\n\U0001f4ca  Report → reports/purview_snowflake_connector_report.html")
+        report_path = generate_report(report_data)
+        print(f"\n\U0001f4ca  Report → {report_path}")
     except Exception as exc:
         print(f"\n⚠️  Report generation failed: {exc}")
         traceback.print_exc()

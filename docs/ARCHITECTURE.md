@@ -119,12 +119,28 @@ All keys are uppercased before comparison to avoid case-sensitivity false positi
 
 ---
 
-### `utils/html_extras.py` — Report Builder
+### `report_ui/` + `utils/report_renderer.py` — Reports
 
-Generates styled HTML fragments that are embedded into individual test results via the `pytest-html` `extra` fixture.
+All HTML, CSS and JS live in `report_ui/`; Python only shapes data.
 
-| Function | Purpose |
-|----------|---------|
+```
+report_ui/
+  shared/{css,js,img,templates}/        branding used by every report (base.css, report.js, base.html, _macros.html)
+  <validation>/{css,js,img,templates}/  per-validation pages (templates/index.html) and extra styling
+```
+
+`render_report("<validation>", context, data=...)` (Jinja2, autoescape on) writes:
+
+```
+reports/assets/{css,js,img}/            copy of report_ui/shared — linked by every report
+reports/<validation>/index.html         + css/ js/ img/ (its own assets) and data/report.json
+```
+
+Each test category (`snowflake_connector_validation`, `purview_scan_trigger_validation`, …) gets its own report folder.
+To add one: create `report_ui/<validation>/templates/index.html` (extends `base.html`, uses the macros in `_macros.html`)
+and `css/report.css`, then build a context dict and call `render_report`. Colours and layout are CSS variables in `base.css`.
+
+----------|---------|
 | `make_table(headers, rows, title)` | Generic styled HTML table; truncates at 500 rows by default |
 | `make_diff_report(entity_type, missing, extra, ...)` | Combined diff summary box + two tables (missing / extra) |
 | `make_excluded_report(found)` | One table per leaking entity type |
@@ -180,12 +196,12 @@ pytest session starts
 ├─ COMPARISON (test_z_comparison.py)
 │   ├─ load_jsonl() / load_jsonl_dir() from both sides
 │   ├─ diff_sets() per entity type
-│   └─ make_diff_report() → embedded in HTML report
+│   └─ report_generator.generate_report() → reports/snowflake_connector_validation/index.html
 │
 ├─ EXCLUDED-DB GUARD (test_z_excluded_objects.py)
 │   └─ find_excluded_in_purview() → fail if any leak detected
 │
-└─ pytest-html generates reports/snowflake_connector_validation/report.html
+└─ reports/snowflake_connector_validation/index.html (rendered from report_ui/ templates)
 ```
 
 ---
@@ -197,6 +213,7 @@ pytest session starts
 | Add a new Snowflake entity | `clients/snowflake_client.py` + new test file |
 | Add a new Purview entity | `clients/purview_client.py` (`_ENTITY_TYPES`) + new test file |
 | Change comparison key logic | `utils/comparator.py` key extractor functions |
-| Customise the HTML report style | `utils/html_extras.py` `_STYLE` constant + `conftest.py` CSS hook |
+| Customise report branding (all reports) | `report_ui/shared/css/base.css` (colour variables) and `shared/templates/` |
+| Customise one report's pages / style | `report_ui/<validation>/templates/` and `css/report.css` |
 | Change retry / timeout behaviour | Constants at the top of `clients/purview_client.py` |
 | Change batch sizes | `_BATCH_SIZE` (search pagination) and `_ENTITY_BULK_SIZE` (bulk entity fetch) |

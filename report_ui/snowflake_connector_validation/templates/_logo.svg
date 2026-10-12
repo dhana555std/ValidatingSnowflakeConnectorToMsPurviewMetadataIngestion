@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 52" height="44"
+     aria-label="Purview Snowflake Validator">
+  <!-- database cylinder -->
+  <ellipse cx="26" cy="14" rx="18" ry="7" fill="none" stroke="#5BAAD8" stroke-width="2.5"/>
+  <line x1="8"  y1="14" x2="8"  y2="38" stroke="#5BAAD8" stroke-width="2.5"/>
+  <line x1="44" y1="14" x2="44" y2="38" stroke="#5BAAD8" stroke-width="2.5"/>
+  <ellipse cx="26" cy="38" rx="18" ry="7" fill="none" stroke="#5BAAD8" stroke-width="2.5"/>
+  <!-- arrow -->
+  <line x1="52" y1="26" x2="72" y2="26" stroke="#E07B29" stroke-width="3" stroke-linecap="round"/>
+  <polyline points="66,20 72,26 66,32" fill="none" stroke="#E07B29"
+            stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- cloud -->
+  <path d="M100 34 Q92 34 92 26 Q92 18 100 18 Q102 11 110 11
+           Q120 11 120 20 Q126 20 126 27 Q126 34 118 34 Z"
+        fill="none" stroke="#5BAAD8" stroke-width="2.5" stroke-linejoin="round"/>
+</svg>

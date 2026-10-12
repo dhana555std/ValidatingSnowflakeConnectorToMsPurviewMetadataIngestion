@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "_macros.html" import table, collapsible, stat_cards %}
+
+{% block title %}Purview Scan Trigger Report{% endblock %}
+{% block logo %}{% include "_logo.svg" %}{% endblock %}
+{% block header_meta %}Scope: <strong>{{ scope }}</strong><br/>Generated {{ generated }} · times in UTC{% endblock %}
+{% block footer %}DDX QA Automation Framework · Purview Scan Trigger Validation{% endblock %}
+
+{% block panes %}
+<div class="tab-pane active" id="tab-overview">
+  <div class="entity-banner">
+    {% for label, value in banner %}
+    <div><b>{{ label }}</b>{{ value }}</div>
+    {% endfor %}
+  </div>
+  <div class="section-h3">Scans</div>
+  {{ stat_cards(scan_cards) }}
+  <div class="section-h3">Runs in last {{ days }} days</div>
+  {{ stat_cards(run_cards) }}
+  <div class="section-h3">Test results ({{ tests.passed }}/{{ tests.total }} passed)</div>
+  {% if tests.total and tests.passed == tests.total %}<div class="ok-box">✔ All {{ tests.total }} tests passed</div>
+  {% elif tests.total %}<div class="err-box">✖ {{ tests.total - tests.passed }} of {{ tests.total }} tests failed</div>{% endif %}
+  {{ table(test_table) }}
+</div>
+
+<div class="tab-pane" id="tab-validation">
+  {% if validation.error %}
+  <div class="warn-box">⚠ Validation did not run: {{ validation.error }}</div>
+  {% else %}
+  {{ stat_cards(validation.cards) }}
+  <div class="{{ validation.summary.cls }}-box">{{ validation.summary.text }}</div>
+  <div class="section-h3">Details</div>
+  {% for g in validation.groups %}
+  {% call collapsible(g.title, g.count, g.cls, g.open) %}{{ table(g.table) }}{% endcall %}
+  {% endfor %}
+  {% endif %}
+</div>
+
+<div class="tab-pane" id="tab-scans">{{ table(scans_table) }}</div>
+<div class="tab-pane" id="tab-runs">{{ table(runs_table) }}</div>
+{% endblock %}

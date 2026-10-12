@@ -1,0 +1,5 @@
+/* Purview scan trigger validation report — styling that is not part of the shared branding. */
+
+.entity-banner { margin-bottom: 18px; display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px 24px; }
+.entity-banner b { display: block; color: var(--muted); font-weight: 600; font-size: 12px; }

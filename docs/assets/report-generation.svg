@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 640" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+  </defs>
+  <rect width="1000" height="640" rx="16" fill="#f8fafc"/>
+  <text x="500" y="38" text-anchor="middle" font-size="20" font-weight="700" fill="#1e293b">Report generation — separation of concerns</text>
+  <text x="500" y="58" text-anchor="middle" font-size="12" fill="#64748b">Python shapes data · Jinja2 templates own the markup · CSS / JS own the look and behaviour</text>
+
+  <text x="170" y="92" text-anchor="middle" font-size="13" font-weight="700" fill="#1B3A5C">1 · DATA  (Python)</text>
+  <text x="500" y="92" text-anchor="middle" font-size="13" font-weight="700" fill="#1B3A5C">2 · RENDERING  (Python + Jinja2)</text>
+  <text x="830" y="92" text-anchor="middle" font-size="13" font-weight="700" fill="#1B3A5C">3 · PRESENTATION  (report_ui/)</text>
+  <rect x="30" y="104" width="280" height="110" rx="10" fill="#E8F0F8" stroke="#2C6FAC"/>
+  <text x="170.0" y="126" text-anchor="middle" font-size="13" font-weight="700" fill="#1B3A5C">pytest session</text>
+  <text x="170.0" y="148" text-anchor="middle" font-size="11" fill="#334155">tests/&lt;validation&gt;/conftest.py</text>
+  <text x="170.0" y="165" text-anchor="middle" font-size="11" fill="#334155">extracts Snowflake / Purview data → JSONL,</text>
+  <text x="170.0" y="182" text-anchor="middle" font-size="11" fill="#334155">collects test outcomes, and at session</text>
+  <text x="170.0" y="199" text-anchor="middle" font-size="11" fill="#334155">finish calls the report builder</text>
+  <rect x="30" y="244" width="280" height="150" rx="10" fill="#E8F0F8" stroke="#2C6FAC"/>
+  <text x="170.0" y="266" text-anchor="middle" font-size="13" font-weight="700" fill="#1B3A5C">Report builders  (no HTML)</text>
+  <text x="170.0" y="288" text-anchor="middle" font-size="11" fill="#334155">utils/report_data_builder.py</text>
+  <text x="170.0" y="305" text-anchor="middle" font-size="11" fill="#334155">utils/report_generator.py  (connector)</text>
+  <text x="170.0" y="322" text-anchor="middle" font-size="11" fill="#334155">scan_report_builder.py  (scan triggers)</text>
+  <text x="170.0" y="339" text-anchor="middle" font-size="11" fill="#334155"></text>
+  <text x="170.0" y="356" text-anchor="middle" font-size="11" font-style="italic" fill="#334155">build_context(data) → plain dict:</text>
+  <text x="170.0" y="373" text-anchor="middle" font-size="11" font-style="italic" fill="#334155">title, tabs, stat cards,</text>
+  <text x="170.0" y="390" text-anchor="middle" font-size="11" font-style="italic" fill="#334155">table_spec(...), badge(...)</text>
+  <rect x="350" y="104" width="300" height="290" rx="10" fill="#FFF4E0" stroke="#E07B29"/>
+  <text x="500.0" y="126" text-anchor="middle" font-size="13" font-weight="700" fill="#8A5300">utils/report_renderer.py</text>
+  <text x="500" y="150" text-anchor="middle" font-size="12" font-weight="700" fill="#334155">render_report(validation, context, data)</text>
+  <text x="364" y="180" font-size="11" fill="#334155">① copy shared css/js/img → reports/assets/</text>
+  <text x="364" y="200" font-size="11" fill="#334155">② copy &lt;validation&gt; css/js/img → its folder</text>
+  <text x="364" y="222" font-size="11" fill="#334155">③ build Jinja2 Environment</text>
+  <text x="364" y="240" font-size="11" fill="#334155">    • loader: [&lt;validation&gt;/templates, shared/templates]</text>
+  <text x="364" y="257" font-size="11" fill="#334155">    • autoescape on — no manual escaping</text>
+  <text x="364" y="274" font-size="11" fill="#334155">    • StrictUndefined — typos fail loudly</text>
+  <text x="364" y="298" font-size="11" fill="#334155">④ render index.html with the context</text>
+  <text x="364" y="318" font-size="11" fill="#334155">⑤ write index.html + data/report.json</text>
+  <text x="500" y="368" text-anchor="middle" font-size="11" font-style="italic" fill="#8A5300">knows nothing about any specific report</text>
+  <rect x="690" y="104" width="280" height="120" rx="10" fill="#EAF7ED" stroke="#1B7A3E"/>
+  <text x="830.0" y="126" text-anchor="middle" font-size="13" font-weight="700" fill="#1B7A3E">report_ui/shared/  (one brand)</text>
+  <text x="830.0" y="148" text-anchor="middle" font-size="11" fill="#334155">css/base.css — colour variables, layout</text>
+  <text x="830.0" y="165" text-anchor="middle" font-size="11" fill="#334155">js/report.js — tabs, row filter</text>
+  <text x="830.0" y="182" text-anchor="middle" font-size="11" fill="#334155">templates/base.html — header, tabs, footer</text>
+  <text x="830.0" y="199" text-anchor="middle" font-size="11" fill="#334155">templates/_macros.html — table, collapsible</text>
+  <rect x="690" y="244" width="280" height="150" rx="10" fill="#EAF7ED" stroke="#1B7A3E"/>
+  <text x="830.0" y="266" text-anchor="middle" font-size="13" font-weight="700" fill="#1B7A3E">report_ui/&lt;validation&gt;/</text>
+  <text x="830.0" y="288" text-anchor="middle" font-size="11" fill="#334155">templates/index.html  ({% extends base.html %})</text>
+  <text x="830.0" y="305" text-anchor="middle" font-size="11" fill="#334155">templates/_logo.svg, partials</text>
+  <text x="830.0" y="322" text-anchor="middle" font-size="11" fill="#334155">css/report.css — only what differs</text>
+  <text x="830.0" y="339" text-anchor="middle" font-size="11" fill="#334155"></text>
+  <text x="830.0" y="356" text-anchor="middle" font-size="11" font-style="italic" fill="#334155">snowflake_connector_validation</text>
+  <text x="830.0" y="373" text-anchor="middle" font-size="11" font-style="italic" fill="#334155">purview_scan_trigger_validation</text>
+  <text x="830.0" y="390" text-anchor="middle" font-size="11" font-style="italic" fill="#334155">… one folder per new test category</text>
+  <line x1="170" y1="214" x2="170" y2="242" stroke="#475569" stroke-width="1.8" marker-end="url(#arr)"/>
+  <line x1="310" y1="320" x2="348" y2="320" stroke="#475569" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text x="329" y="312" text-anchor="middle" font-size="10" fill="#475569">context</text>
+  <line x1="690" y1="164" x2="652" y2="164" stroke="#475569" stroke-width="1.8" marker-end="url(#arr)"/>
+  <line x1="690" y1="320" x2="652" y2="320" stroke="#475569" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text x="671" y="312" text-anchor="middle" font-size="10" fill="#475569">templates</text>
+  <text x="671" y="154" text-anchor="middle" font-size="10" fill="#475569">assets</text>
+  <line x1="500" y1="394" x2="500" y2="436" stroke="#475569" stroke-width="1.8" marker-end="url(#arr)"/>
+  <rect x="30" y="436" width="940" height="184" rx="10" fill="#F1F5F9" stroke="#64748b"/>
+  <text x="500" y="460" text-anchor="middle" font-size="13" font-weight="700" fill="#1e293b">4 · OUTPUT  —  reports/   (generated, git-ignored)</text>
+  <rect x="50" y="474" width="250" height="130" rx="8" fill="#FFFFFF" stroke="#2C6FAC"/>
+  <text x="175.0" y="496" text-anchor="middle" font-size="12" font-weight="700" fill="#1B3A5C">reports/assets/   (shared)</text>
+  <text x="175.0" y="520" text-anchor="middle" font-size="11" fill="#334155">css/base.css</text>
+  <text x="175.0" y="538" text-anchor="middle" font-size="11" fill="#334155">js/report.js</text>
+  <text x="175.0" y="566" text-anchor="middle" font-size="11" font-style="italic" fill="#64748b">one copy, one brand —</text>
+  <text x="175.0" y="582" text-anchor="middle" font-size="11" font-style="italic" fill="#64748b">change it once, every report changes</text>
+  <rect x="330" y="474" width="300" height="130" rx="8" fill="#FFFFFF" stroke="#E07B29"/>
+  <text x="480.0" y="496" text-anchor="middle" font-size="12" font-weight="700" fill="#8A5300">reports/snowflake_connector_validation/</text>
+  <text x="480.0" y="520" text-anchor="middle" font-size="11" fill="#334155">index.html  → ../assets/css/base.css</text>
+  <text x="480.0" y="538" text-anchor="middle" font-size="11" fill="#334155">css/report.css</text>
+  <text x="480.0" y="556" text-anchor="middle" font-size="11" fill="#334155">data/report.json, data/test_results.json</text>
+  <rect x="660" y="474" width="300" height="130" rx="8" fill="#FFFFFF" stroke="#E07B29"/>
+  <text x="810.0" y="496" text-anchor="middle" font-size="12" font-weight="700" fill="#8A5300">reports/purview_scan_trigger_validation/</text>
+  <text x="810.0" y="520" text-anchor="middle" font-size="11" fill="#334155">index.html  → ../assets/css/base.css</text>
+  <text x="810.0" y="538" text-anchor="middle" font-size="11" fill="#334155">css/report.css</text>
+  <text x="810.0" y="556" text-anchor="middle" font-size="11" fill="#334155">data/ (report.json, CSV, JSONL)</text>
+</svg>

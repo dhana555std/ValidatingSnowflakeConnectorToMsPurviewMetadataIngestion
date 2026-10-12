@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>{% block title %}{{ title }}{% endblock %}</title>
+  <link rel="stylesheet" href="{{ assets }}/css/base.css"/>
+  <link rel="stylesheet" href="css/report.css"/>
+</head>
+<body>
+<header>
+  <div class="brand">
+    {% block logo %}{% endblock %}
+    <div>
+      <div class="title">{{ title }}</div>
+      <div class="subtitle">{{ subtitle }}</div>
+    </div>
+  </div>
+  <div class="meta">{% block header_meta %}{% endblock %}</div>
+</header>
+
+<div class="container">
+  <div class="tab-bar">
+    {% for t in tabs %}
+    <button class="tab-btn{{ ' active' if loop.first }}" data-tab="{{ t.id }}">{{ t.label }}{% if t.flag|default(false) %}<span class="flag" title="{{ t.flag_title|default('Has failures') }}">●</span>{% endif %}</button>
+    {% endfor %}
+  </div>
+  <div class="tab-content">
+    {% block panes %}{% endblock %}
+  </div>
+</div>
+
+<footer>{% block footer %}{{ footer }}{% endblock %}</footer>
+<script src="{{ assets }}/js/report.js"></script>
+</body>
+</html>

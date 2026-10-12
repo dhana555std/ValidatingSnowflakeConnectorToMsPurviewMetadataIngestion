@@ -1,7 +1,7 @@
 """Bidirectional column comparison: Snowflake ↔ MS Purview.
  
 Data is pre-extracted by the session fixture in conftest.py.
-Columns are stored per-schema under data/actual/columns/ and data/expected/columns/.
+Columns are stored per-schema under data/snowflake_connector_validation/snowflake_results/columns/ and data/snowflake_connector_validation/purview_results/columns/.
 """
  
 import os
@@ -9,8 +9,10 @@ import os
 import pytest
 from utils.comparator import compare_columns, load_jsonl_dir
  
-_ACTUAL = "data/actual"
-_EXPECTED = "data/expected"
+from utils.paths import SNOWFLAKE_RESULTS_DIR, PURVIEW_RESULTS_DIR
+
+_ACTUAL   = SNOWFLAKE_RESULTS_DIR
+_EXPECTED = PURVIEW_RESULTS_DIR
 _MAX_LISTED = 100   # how many offending columns to print in the failure message
  
  

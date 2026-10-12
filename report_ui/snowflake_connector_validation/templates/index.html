@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "_macros.html" import table, collapsible, stat_cards %}
+{% from "_collection.html" import collection_card %}
+
+{% block title %}Purview ↔ Snowflake Validator — {{ env }}{% endblock %}
+{% block logo %}{% include "_logo.svg" %}{% endblock %}
+{% block header_meta %}Environment: <strong>{{ env }}</strong><br/>Generated: {{ generated }}{% endblock %}
+{% block footer %}&copy; {{ year }} Purview–Snowflake Validator &nbsp;|&nbsp; Open-source metadata validation tool &nbsp;|&nbsp; Report generated {{ generated }}{% endblock %}
+
+{% block panes %}
+<div class="tab-pane active" id="tab-overview">
+  {{ collection_card(collection) }}
+  {{ stat_cards(stats) }}
+  <p class="env-line">Environment: <strong>{{ env }}</strong> &nbsp;|&nbsp; Duration: <strong>{{ duration }} s</strong></p>
+  <h3 class="section-h3">Extraction Summary</h3>
+  {{ table(extraction_table) }}
+  <h3 class="section-h3">Test Results</h3>
+  {{ table(test_table) }}
+</div>
+
+{% for e in entities %}
+<div class="tab-pane" id="{{ e.tid }}">
+  <h2 class="entity-title">{{ e.icon }} {{ e.label }}</h2>
+  {% if e.state == "error" %}
+  <div class="err-box">⚠️ Comparison error: {{ e.error }}</div>
+  {% elif e.state == "no_data" %}
+  <div class="entity-banner"><strong>No extraction data available.</strong> Check console — a connection or extraction error may have caused early exit.</div>
+  {% else %}
+  <div class="entity-banner {{ 'pass' if e.in_sync else 'fail' }}">
+    <strong class="{{ 'text-good' if e.in_sync else 'text-bad' }}">{{ "✅ PASS — Sets are equal" if e.in_sync else "❌ FAIL — Mismatch detected" }}</strong><br/>
+    Snowflake: <strong>{{ e.sf_count|num }}</strong>
+    &nbsp;|&nbsp; Purview: <strong>{{ e.pv_count|num }}</strong>
+    &nbsp;|&nbsp; Missing from Purview: <strong class="{{ 'text-bad' if e.missing else 'text-good' }}">{{ e.missing|length|num }}</strong>
+    &nbsp;|&nbsp; Extra in Purview: <strong class="{{ 'text-bad' if e.extra else 'text-good' }}">{{ e.extra|length|num }}</strong>
+    &nbsp;|&nbsp; Empty description: <strong class="{{ 'text-warn' if e.empty else 'text-good' }}">{{ e.empty|length|num }}</strong>
+  </div>
+
+  {% if e.missing %}
+  {% call collapsible("⬇️ In Snowflake — NOT in Purview", e.missing|length, "bad") %}{{ table(e.missing_table) }}{% endcall %}
+  {% else %}
+  <div class="ok-box">✅ All {{ e.label|lower }} are present in Purview.</div>
+  {% endif %}
+
+  {% if e.extra %}
+  {% call collapsible("⬆️ In Purview — NOT in Snowflake", e.extra|length, "warn") %}{{ table(e.extra_table) }}{% endcall %}
+  {% else %}
+  <div class="ok-box">✅ No extra {{ e.label|lower }} in Purview.</div>
+  {% endif %}
+
+  {% if e.empty %}
+  {% call collapsible("📝 Empty Description in Purview", e.empty|length) %}{{ table(e.empty_table) }}{% endcall %}
+  {% else %}
+  <div class="ok-box">✅ All {{ e.label|lower }} have descriptions in Purview.</div>
+  {% endif %}
+  {% endif %}
+</div>
+{% endfor %}
+{% endblock %}

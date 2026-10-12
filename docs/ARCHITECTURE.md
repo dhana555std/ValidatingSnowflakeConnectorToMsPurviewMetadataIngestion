@@ -17,7 +17,7 @@ Phase 1 — Extract      →   Phase 2 — Validate      →   Phase 3 — Compa
 
 Each phase writes JSONL files to disk. Later phases read from those files, so the phases are decoupled — you can re-run only the comparison phase without re-fetching data from the cloud, provided the JSONL files are still present.
 
-> **Note:** The session-scoped `clear_results` fixture in `conftest.py` wipes both `data/actual/` and `data/expected/` at the **start** of every full test session. This guarantees that each run reflects the current state of both systems.
+> **Note:** The session-scoped `clear_results` fixture in `conftest.py` wipes both `data/snowflake_connector_validation/snowflake_data_validation/` and `data/snowflake_connector_validation/purview_data_validation/` at the **start** of every full test session. This guarantees that each run reflects the current state of both systems.
 
 ---
 
@@ -57,7 +57,7 @@ The `_stream()` generator fetches rows in batches of `_BATCH_SIZE = 5,000`, writ
 
 **Per-schema column splitting**
 
-`extract_all_columns()` uses `_stream_to_jsonl_by_schema()` to write one JSONL file per `<DATABASE>/<SCHEMA>` combination under `data/actual/columns/`. This avoids creating a single multi-gigabyte file for large warehouses.
+`extract_all_columns()` uses `_stream_to_jsonl_by_schema()` to write one JSONL file per `<DATABASE>/<SCHEMA>` combination under `data/snowflake_connector_validation/snowflake_data_validation/columns/`. This avoids creating a single multi-gigabyte file for large warehouses.
 
 ---
 
@@ -119,12 +119,28 @@ All keys are uppercased before comparison to avoid case-sensitivity false positi
 
 ---
 
-### `utils/html_extras.py` — Report Builder
+### `report_ui/` + `utils/report_renderer.py` — Reports
 
-Generates styled HTML fragments that are embedded into individual test results via the `pytest-html` `extra` fixture.
+All HTML, CSS and JS live in `report_ui/`; Python only shapes data.
 
-| Function | Purpose |
-|----------|---------|
+```
+report_ui/
+  shared/{css,js,img,templates}/        branding used by every report (base.css, report.js, base.html, _macros.html)
+  <validation>/{css,js,img,templates}/  per-validation pages (templates/index.html) and extra styling
+```
+
+`render_report("<validation>", context, data=...)` (Jinja2, autoescape on) writes:
+
+```
+reports/assets/{css,js,img}/            copy of report_ui/shared — linked by every report
+reports/<validation>/index.html         + css/ js/ img/ (its own assets) and data/report.json
+```
+
+Each test category (`snowflake_connector_validation`, `purview_scan_trigger_validation`, …) gets its own report folder.
+To add one: create `report_ui/<validation>/templates/index.html` (extends `base.html`, uses the macros in `_macros.html`)
+and `css/report.css`, then build a context dict and call `render_report`. Colours and layout are CSS variables in `base.css`.
+
+----------|---------|
 | `make_table(headers, rows, title)` | Generic styled HTML table; truncates at 500 rows by default |
 | `make_diff_report(entity_type, missing, extra, ...)` | Combined diff summary box + two tables (missing / extra) |
 | `make_excluded_report(found)` | One table per leaking entity type |
@@ -159,33 +175,33 @@ All extraction fixtures are `scope="module"`. The `SnowflakeClient` and `Purview
 pytest session starts
 │
 ├─ clear_results (autouse)
-│   └─ wipes data/actual/ and data/expected/
+│   └─ wipes data/snowflake_connector_validation/snowflake_data_validation/ and data/snowflake_connector_validation/purview_data_validation/
 │
 ├─ SNOWFLAKE EXTRACTION (test_*.py)
 │   ├─ SnowflakeClient connects (session-scoped)
-│   ├─ extract_all_schemas()        → data/actual/schemas.jsonl
-│   ├─ extract_all_tables()         → data/actual/tables.jsonl
-│   ├─ extract_all_views()          → data/actual/views.jsonl
-│   ├─ extract_all_columns()        → data/actual/columns/<DB>/<SCHEMA>.jsonl
-│   └─ extract_all_stored_procedures() → data/actual/stored_procedures.jsonl
+│   ├─ extract_all_schemas()        → data/snowflake_connector_validation/snowflake_data_validation/snowflake_schemas.jsonl
+│   ├─ extract_all_tables()         → data/snowflake_connector_validation/snowflake_data_validation/snowflake_tables.jsonl
+│   ├─ extract_all_views()          → data/snowflake_connector_validation/snowflake_data_validation/snowflake_views.jsonl
+│   ├─ extract_all_columns()        → data/snowflake_connector_validation/snowflake_data_validation/columns/<DB>/<SCHEMA>.jsonl
+│   └─ extract_all_stored_procedures() → data/snowflake_connector_validation/snowflake_data_validation/snowflake_stored_procedures.jsonl
 │
 ├─ PURVIEW EXTRACTION (test_purview_*.py)
 │   ├─ PurviewClient resolves Commercial collection ref (cached)
-│   ├─ _search('snowflake_database') → data/expected/purview_databases.jsonl
-│   ├─ _search('snowflake_schema')   → data/expected/purview_schemas.jsonl
-│   ├─ _search('snowflake_table')    → data/expected/purview_tables.jsonl
-│   ├─ _search('snowflake_view')     → data/expected/purview_views.jsonl
-│   └─ bulk entity fetch (tables+views) → data/expected/columns/<DB>/<SCHEMA>.jsonl
+│   ├─ _search('snowflake_database') → data/snowflake_connector_validation/purview_data_validation/purview_databases.jsonl
+│   ├─ _search('snowflake_schema')   → data/snowflake_connector_validation/purview_data_validation/purview_schemas.jsonl
+│   ├─ _search('snowflake_table')    → data/snowflake_connector_validation/purview_data_validation/purview_tables.jsonl
+│   ├─ _search('snowflake_view')     → data/snowflake_connector_validation/purview_data_validation/purview_views.jsonl
+│   └─ bulk entity fetch (tables+views) → data/snowflake_connector_validation/purview_data_validation/columns/<DB>/<SCHEMA>.jsonl
 │
 ├─ COMPARISON (test_z_comparison.py)
 │   ├─ load_jsonl() / load_jsonl_dir() from both sides
 │   ├─ diff_sets() per entity type
-│   └─ make_diff_report() → embedded in HTML report
+│   └─ report_generator.generate_report() → reports/snowflake_connector_validation/index.html
 │
 ├─ EXCLUDED-DB GUARD (test_z_excluded_objects.py)
 │   └─ find_excluded_in_purview() → fail if any leak detected
 │
-└─ pytest-html generates reports/report.html
+└─ reports/snowflake_connector_validation/index.html (rendered from report_ui/ templates)
 ```
 
 ---
@@ -197,6 +213,7 @@ pytest session starts
 | Add a new Snowflake entity | `clients/snowflake_client.py` + new test file |
 | Add a new Purview entity | `clients/purview_client.py` (`_ENTITY_TYPES`) + new test file |
 | Change comparison key logic | `utils/comparator.py` key extractor functions |
-| Customise the HTML report style | `utils/html_extras.py` `_STYLE` constant + `conftest.py` CSS hook |
+| Customise report branding (all reports) | `report_ui/shared/css/base.css` (colour variables) and `shared/templates/` |
+| Customise one report's pages / style | `report_ui/<validation>/templates/` and `css/report.css` |
 | Change retry / timeout behaviour | Constants at the top of `clients/purview_client.py` |
 | Change batch sizes | `_BATCH_SIZE` (search pagination) and `_ENTITY_BULK_SIZE` (bulk entity fetch) |

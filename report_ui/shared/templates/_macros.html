@@ -1,0 +1,36 @@
+{# Shared building blocks. Import with: {% from "_macros.html" import table, collapsible, stat_cards %} #}
+
+{# t = utils.report_renderer.table_spec(...). A cell may be plain text or {"text", "badge"}. #}
+{% macro table(t) %}
+{% if not t.rows %}
+<p class="empty">Nothing to show.</p>
+{% else %}
+{% if t.filterable %}<input class="filter" data-target="{{ t.id }}" placeholder="Filter rows…">{% endif %}
+<div class="table-wrap"><table class="vt-table"{% if t.id %} id="{{ t.id }}"{% endif %}>
+  <thead><tr>{% for h in t.headers %}<th>{{ h }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for row in t.rows %}
+    <tr>{% for c in row %}<td{% if loop.index0 in t.wrap %} class="wrap"{% endif %}>{% if c is mapping %}<span class="badge {{ c.badge }}">{{ c.text }}</span>{% elif c is not none %}{{ c }}{% endif %}</td>{% endfor %}</tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% if t.show_count %}<p class="row-count">{{ t.rows|length|num }} row(s)</p>{% endif %}
+{% endif %}
+{% endmacro %}
+
+{# <details> block, collapsed unless open=true. cls: bad | warn | ok | (blank = info). #}
+{% macro collapsible(title, count=none, cls="", open=false) %}
+<details class="collapsible {{ cls }}"{% if open %} open{% endif %}>
+  <summary>{{ title }}{% if count is not none %}<span class="count">{{ count|num }}</span>{% endif %}</summary>
+  <div class="collapsible-body">{{ caller() }}</div>
+</details>
+{% endmacro %}
+
+{# cards = [{"label", "value", "cls"}]; cls: ok | bad | warn | mute | (blank) #}
+{% macro stat_cards(cards) %}
+<div class="stat-row">
+  {% for c in cards %}
+  <div class="stat-card {{ c.cls }}"><div class="stat-val">{{ c.value }}</div><div class="stat-lbl">{{ c.label }}</div></div>
+  {% endfor %}
+</div>
+{% endmacro %}

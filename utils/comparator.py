@@ -112,25 +112,25 @@ def diff_sets(
 # ── per-entity comparisons ────────────────────────────────────────────────────
 
 def compare_databases(actual_dir: str, expected_dir: str):
-    sf = load_jsonl(os.path.join(actual_dir, "databases.jsonl"))
+    sf = load_jsonl(os.path.join(actual_dir, "snowflake_databases.jsonl"))
     pv = load_jsonl(os.path.join(expected_dir, "purview_databases.jsonl"))
     return diff_sets(sf, pv, _sf_db_key, _pv_db_key)
 
 
 def compare_schemas(actual_dir: str, expected_dir: str):
-    sf = load_jsonl(os.path.join(actual_dir, "schemas.jsonl"))
+    sf = load_jsonl(os.path.join(actual_dir, "snowflake_schemas.jsonl"))
     pv = load_jsonl(os.path.join(expected_dir, "purview_schemas.jsonl"))
     return diff_sets(sf, pv, _sf_schema_key, _pv_schema_key)
 
 
 def compare_tables(actual_dir: str, expected_dir: str):
-    sf = load_jsonl(os.path.join(actual_dir, "tables.jsonl"))
+    sf = load_jsonl(os.path.join(actual_dir, "snowflake_tables.jsonl"))
     pv = load_jsonl(os.path.join(expected_dir, "purview_tables.jsonl"))
     return diff_sets(sf, pv, _sf_table_key, _pv_table_key)
 
 
 def compare_views(actual_dir: str, expected_dir: str):
-    sf = load_jsonl(os.path.join(actual_dir, "views.jsonl"))
+    sf = load_jsonl(os.path.join(actual_dir, "snowflake_views.jsonl"))
     pv = load_jsonl(os.path.join(expected_dir, "purview_views.jsonl"))
     return diff_sets(sf, pv, _sf_view_key, _pv_view_key)
 
@@ -150,7 +150,7 @@ def _pv_sp_key(r: Dict) -> str:
 
 
 def compare_stored_procedures(actual_dir: str, expected_dir: str):
-    sf = load_jsonl(os.path.join(actual_dir, "stored_procedures.jsonl"))
+    sf = load_jsonl(os.path.join(actual_dir, "snowflake_stored_procedures.jsonl"))
     pv = load_jsonl(os.path.join(expected_dir, "purview_stored_procedures.jsonl"))
     return diff_sets(sf, pv, _sf_sp_key, _pv_sp_key)
 

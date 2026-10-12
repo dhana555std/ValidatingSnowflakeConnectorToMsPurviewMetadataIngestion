@@ -1,0 +1,46 @@
+{# Collection card on the Overview tab. `collection` comes from report_generator._collection_context(). #}
+{% macro path_icon(root) %}
+<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#424242" stroke-width="1.2" stroke-linejoin="round" aria-hidden="true">
+  {% if root %}
+  <path d="M5.2 15.5h9.6a3.3 3.3 0 0 0 .6-6.5 4.6 4.6 0 0 0-8.9-.9A3.7 3.7 0 0 0 5.2 15.5z"/>
+  <path d="M7.5 15.5v-3.2l2.5-1.6 2.5 1.6v3.2"/>
+  {% else %}
+  <path d="M7 6.5V3.5h9.5V13h-3"/>
+  <rect x="3.5" y="6.5" width="9.5" height="10" rx="0.5"/>
+  {% endif %}
+</svg>
+{% endmacro %}
+
+{% macro collection_card(c) %}
+{% if c.missing_reason %}
+<div class="err-box">⚠️ Collection: {{ c.missing_reason }}</div>
+{% else %}
+<div class="coll-card {{ c.env_cls }}">
+  <div class="coll-card-head">
+    <span class="env-badge">{{ c.env_label }}</span>
+    <strong class="coll-title">{{ c.path }}</strong>
+  </div>
+  <div class="coll-card-body">
+  {% if c.error %}
+    <div class="err-box">⚠️ Could not extract metadata: {{ c.error }}</div>
+  {% else %}
+    <div class="coll-subhead">Collection Metadata</div>
+    <table class="kv-table"><tbody>
+    {% for row in c.rows %}
+      <tr><th>{{ row.label }}</th><td>
+      {% if row.path_nodes %}
+        <div class="cpath">
+        {% for name in row.path_nodes %}
+          {% if not loop.first %}<div class="cpath-line"></div>{% endif %}
+          <div class="cpath-node"><span class="cpath-icon">{{ path_icon(loop.first) }}</span><span class="cpath-name">{{ name }}</span></div>
+        {% endfor %}
+        </div>
+      {% else %}{{ row.value }}{% endif %}
+      </td></tr>
+    {% endfor %}
+    </tbody></table>
+  {% endif %}
+  </div>
+</div>
+{% endif %}
+{% endmacro %}

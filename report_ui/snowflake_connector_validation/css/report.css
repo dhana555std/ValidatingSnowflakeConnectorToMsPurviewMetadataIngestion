@@ -1,0 +1,34 @@
+/* Snowflake connector validation report — styling that is not part of the shared branding. */
+
+.vt-table td { white-space: normal; word-break: break-all; }   /* long qualified names */
+.env-line { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+.entity-title { font-size: 18px; margin-bottom: 14px; }
+.entity-banner { line-height: 1.9; }
+.entity-banner.pass { border-left: 5px solid var(--success); }
+.entity-banner.fail { border-left: 5px solid var(--error); }
+
+/* ── Collection card (Overview) ── */
+.coll-card { --env: var(--muted); --env-bg: var(--mute-bg);
+  border: 1px solid var(--border); border-top: 5px solid var(--env); border-radius: 8px;
+  overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); background: var(--white); margin-bottom: 18px; }
+.coll-card.env-prod    { --env: var(--navy);   --env-bg: #E3ECF6; }
+.coll-card.env-nonprod { --env: var(--accent); --env-bg: #FDF0E4; }
+.coll-card-head { padding: 12px 16px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border); background: var(--env-bg); }
+.coll-title { font-size: 15px; }
+.coll-card-body { padding: 12px 16px 16px; }
+.coll-subhead { font-size: 12px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px; margin: 4px 0 6px; }
+.env-badge { border-radius: 4px; padding: 3px 10px; font-size: 12px; font-weight: 800;
+  letter-spacing: .6px; background: var(--env); color: var(--white); text-transform: uppercase; }
+.kv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.kv-table th { text-align: left; width: 38%; color: var(--muted); font-weight: 600;
+  padding: 6px 8px; border-bottom: 1px solid #E6ECF3; vertical-align: top; }
+.kv-table td { padding: 6px 8px; border-bottom: 1px solid #E6ECF3; word-break: break-all; }
+
+/* ── Collection path (Purview style) ── */
+.cpath { font-family: "Segoe UI", Arial, Helvetica, sans-serif; padding: 2px 0; }
+.cpath-node { display: flex; align-items: center; gap: 12px; }
+.cpath-icon { width: 20px; height: 20px; display: inline-flex; flex: 0 0 20px; }
+.cpath-name { font-size: 14px; font-weight: 600; color: #0F3D78; word-break: normal; }
+.cpath-line { width: 1px; height: 14px; background: #A0A0A0; margin: 3px 0 3px 10px; }

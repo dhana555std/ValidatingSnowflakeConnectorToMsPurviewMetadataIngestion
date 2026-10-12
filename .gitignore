@@ -13,8 +13,8 @@ dist/
 build/
 
 # Test outputs (regenerated on every run)
-data/actual/
-data/expected/
+data/snowflake_connector_validation/snowflake_data_validation/
+data/snowflake_connector_validation/purview_data_validation/
 reports/
 
 # IDE
@@ -24,3 +24,5 @@ reports/
 
 # macOS
 .DS_Store
+data/
+tests/purview_scan_trigger_validation/expected_schedule.csv

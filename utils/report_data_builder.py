@@ -17,9 +17,10 @@ import json
 from typing import Any, Dict, List
  
 from utils import comparator as cmp
- 
-_ACTUAL_DIR   = "data/actual"
-_EXPECTED_DIR = "data/expected"
+from utils.paths import SNOWFLAKE_RESULTS_DIR, PURVIEW_RESULTS_DIR
+
+_ACTUAL_DIR      = SNOWFLAKE_RESULTS_DIR
+_EXPECTED_DIR    = PURVIEW_RESULTS_DIR
 _COLLECTION_FILE = "purview_collection_commercial.json"
  
 # Display order in the report — anything else sorts after these, alphabetically
@@ -122,11 +123,11 @@ def build_report_data(
  
     # ── extraction counts (from JSONL files, not from runtime memory) ─────────
     sf_paths = {
-        "databases":         os.path.join(actual_dir, "databases.jsonl"),
-        "schemas":           os.path.join(actual_dir, "schemas.jsonl"),
-        "tables":            os.path.join(actual_dir, "tables.jsonl"),
-        "views":             os.path.join(actual_dir, "views.jsonl"),
-        "stored_procedures": os.path.join(actual_dir, "stored_procedures.jsonl"),
+        "databases":         os.path.join(actual_dir, "snowflake_databases.jsonl"),
+        "schemas":           os.path.join(actual_dir, "snowflake_schemas.jsonl"),
+        "tables":            os.path.join(actual_dir, "snowflake_tables.jsonl"),
+        "views":             os.path.join(actual_dir, "snowflake_views.jsonl"),
+        "stored_procedures": os.path.join(actual_dir, "snowflake_stored_procedures.jsonl"),
     }
     pv_paths = {
         "databases":         os.path.join(expected_dir, "purview_databases.jsonl"),

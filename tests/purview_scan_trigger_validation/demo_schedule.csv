@@ -1,0 +1,5 @@
+scan_name,expected_run_time,frequency,day,time,timezone,tolerance_minutes,duration_minutes
+EA_RENAL_360,,Monthly,22nd,10:25,UTC,60,0
+EA_CDL,,Monthly,22nd,10:28,UTC,60,0
+EA_EBIRD,,Monthly,22nd,10:31,UTC,60,0
+NOT_A_REAL_SCAN,,Monthly,22nd,10:34,UTC,60,0

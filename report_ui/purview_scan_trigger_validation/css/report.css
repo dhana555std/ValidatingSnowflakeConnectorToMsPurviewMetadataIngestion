@@ -1,0 +1,53 @@
+/* Purview scan trigger validation report - styling that is not part of the shared branding. */
+
+.entity-banner {
+  margin-bottom: 18px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 6px 24px;
+}
+
+.entity-banner b {
+  display: block;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+/* Sortable Scans table headers. */
+#t-scans th.sortable-column {
+  cursor: pointer;
+  position: relative;
+  padding-right: 28px;
+  user-select: none;
+}
+
+#t-scans th.sortable-column::after {
+  content: "\21C5";
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #a8c8e8;
+  font-size: 12px;
+  line-height: 1;
+}
+
+#t-scans th.sortable-column.sort-ascending::after {
+  content: "\25B2";
+  color: #ffffff;
+}
+
+#t-scans th.sortable-column.sort-descending::after {
+  content: "\25BC";
+  color: #ffffff;
+}
+
+#t-scans th.sortable-column:focus {
+  outline: 2px solid #ffffff;
+  outline-offset: -3px;
+}
+
+#t-scans th.sortable-column:hover {
+  background-color: rgba(255, 255, 255, 0.10);
+}

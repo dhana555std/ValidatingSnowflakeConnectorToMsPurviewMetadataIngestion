@@ -1,0 +1,11 @@
+scan_name,expected_run_time,frequency,day,time,timezone,tolerance_minutes,duration_minutes
+EA_RENAL360,,Monthly,1st,00:00,UTC,60,50
+EA_CDL,,Monthly,1st,06:00,UTC,60,98
+EA_EBIRD,,Monthly,1st,12:00,UTC,60,105
+EA_LMRF_US,,Monthly,1st,18:00,UTC,60,155
+EA_GDL,,Monthly,2nd,00:00,UTC,60,108
+EA_DHLTH,,Monthly,2nd,06:00,UTC,60,463
+EA_GLBL_SMPHNY,,Monthly,2nd,12:00,UTC,60,39
+EA_LRMF_CA,,Monthly,2nd,18:00,UTC,60,54
+EA_OMNI,,Monthly,3rd,00:00,UTC,60,50
+EA_RDH,,Monthly,3rd,06:00,UTC,60,54

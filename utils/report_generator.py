@@ -1,20 +1,22 @@
+
 """
 report_generator
 ================
 Builds the Purview ↔ Snowflake validation report as a folder:
  
-    reports/SnowflakeMsPurview-<YYYYMMDD_HHMMSS>/
-        report.html              rendered from templates/report.html.j2
-        css/report.css           rendered from templates/report.css.j2
-        js/report.js             rendered from templates/report.js.j2
+    reports/SnowflakeMsPurview-<REGION>-<YYYYMMDD_HHMMSS>/
+        report.html              rendered from templates/report.html.j2 (Jinja)
+        css/report.css           copied as-is from static/report.css
+        js/report.js             copied as-is from static/report.js
         js/manifest.js           dataset index (counts, headers, shard counts)
         js/data/<name>.NNNNN.js  paged data shards loaded on demand by the page
         images/                  copied from static/images/ (logo, favicon, icons)
         jsonl/                   downloadable data: summary, test_results, run_meta,
                                  and <entity>_missing / _extra / _empty_description
  
-This module contains Python only. All markup lives in templates/*.j2 and all
-images in static/images/.
+This module contains Python only. Jinja is used for the HTML page alone
+(templates/report.html.j2). CSS, JS and images are plain static files under
+static/ and are copied into each run folder untouched.
  
 Why the page no longer runs out of memory
 -----------------------------------------
@@ -26,6 +28,7 @@ PAGE_SIZE rows per page. The browser only ever holds one shard.
 import datetime
 import json
 import os
+import re
 import shutil
 from typing import Any, Dict, Iterable, List, Optional, Tuple
  
@@ -39,21 +42,9 @@ SEARCH_CAP  = 5_000    # max matches kept by the in-page filter
  
 assert SHARD_SIZE % PAGE_SIZE == 0, "SHARD_SIZE must be a multiple of PAGE_SIZE"
  
-_ROOT             = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEMPLATE_DIR      = os.path.join(_ROOT, "templates")
-STATIC_IMAGES_DIR = os.path.join(_ROOT, "static", "images")
- 
-# ── theme (injected into the CSS and HTML templates) ──────────────────────────
-THEME: Dict[str, Any] = {
-    "navy": "#1B3A5C", "blue": "#2C6FAC", "blue_lt": "#E8F0F8",
-    "accent": "#E07B29", "white": "#FFFFFF", "bg": "#F5F7FA",
-    "text": "#1A2636", "muted": "#6B7A8D", "success": "#1B7A3E",
-    "error": "#B5291C", "warn_bg": "#FFF4E0", "err_bg": "#FDECEA",
-    "ok_bg": "#EAF7ED",
-    # environment → (strong colour, light background)
-    "env_colours": {"Prod": ("#1B3A5C", "#E3ECF6"), "NonProd": ("#E07B29", "#FDF0E4")},
-    "env_default": ("#6B7A8D", "#F0F0F0"),
-}
+_ROOT        = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TEMPLATE_DIR = os.path.join(_ROOT, "templates")
+STATIC_DIR   = os.path.join(_ROOT, "static")
  
 ENTITY_LABELS = {
     "databases":         "Databases",
@@ -78,23 +69,33 @@ _EMPTY_DEFAULT_FIELDS  = (["name", "qualifiedName"], ["Name", "Qualified Name"])
 # Run-folder helpers
 # ══════════════════════════════════════════════════════════════════════════════
  
-def create_run_dir(base: str = "reports", when: Optional[datetime.datetime] = None) -> str:
-    """Create reports/SnowflakeMsPurview-<timestamp>/ with its sub-folders."""
+def create_run_dir(
+    base: str = "reports",
+    when: Optional[datetime.datetime] = None,
+    tag: Optional[str] = None,
+) -> str:
+    """Create reports/SnowflakeMsPurview-[<TAG>-]<timestamp>/ with its sub-folders."""
     stamp = (when or datetime.datetime.now()).strftime("%Y%m%d_%H%M%S")
-    run_dir = os.path.join(base, f"{RUN_PREFIX}{stamp}")
+    name = f"{RUN_PREFIX}{tag}-{stamp}" if tag else f"{RUN_PREFIX}{stamp}"
+    run_dir = os.path.join(base, name)
     _ensure_layout(run_dir)
     return run_dir
  
  
-def find_latest_run_dir(base: str = "reports") -> Optional[str]:
-    """Newest run folder under *base* (timestamps sort lexicographically)."""
+def find_latest_run_dir(base: str = "reports", tag: Optional[str] = None) -> Optional[str]:
+    """Newest run folder under *base* (for one region when *tag* is given)."""
     if not os.path.isdir(base):
         return None
-    runs = sorted(
+    prefix = f"{RUN_PREFIX}{tag}-" if tag else RUN_PREFIX
+    runs = [
         d for d in os.listdir(base)
-        if d.startswith(RUN_PREFIX) and os.path.isdir(os.path.join(base, d))
-    )
-    return os.path.join(base, runs[-1]) if runs else None
+        if d.startswith(prefix) and os.path.isdir(os.path.join(base, d))
+        and re.search(r"\d{8}_\d{6}$", d)
+    ]
+    if not runs:
+        return None
+    runs.sort(key=lambda d: d[-15:])          # newest timestamp, whatever the region
+    return os.path.join(base, runs[-1])
  
  
 def _ensure_layout(run_dir: str) -> None:
@@ -128,9 +129,11 @@ def write_test_results(run_dir: str, data: Dict[str, Any]) -> None:
     _write_jsonl(os.path.join(run_dir, "jsonl", "test_results.jsonl"),
                  data.get("test_results") or [])
     _write_jsonl(os.path.join(run_dir, "jsonl", "run_meta.jsonl"), [{
-        "environment": data.get("environment"),
-        "start_time":  data.get("start_time"),
-        "end_time":    data.get("end_time"),
+        "environment":  data.get("environment"),
+        "region":       data.get("region"),
+        "region_label": data.get("region_label"),
+        "start_time":   data.get("start_time"),
+        "end_time":     data.get("end_time"),
     }])
  
  
@@ -241,6 +244,7 @@ def _collection_view(data: dict) -> Tuple[Optional[Dict[str, Any]], str]:
     path = col.get("collection_path") or col.get("collection_name") or ""
     return {
         "environment": col.get("environment") or data.get("environment", ""),
+        "env_class":   re.sub(r"[^a-z0-9]", "", str(col.get("environment") or data.get("environment", "")).lower()),
         "name":        col.get("collection_name"),
         "id":          col.get("collection_id"),
         "path":        path,
@@ -307,12 +311,30 @@ def _jinja_env() -> Environment:
     return env
  
  
-def _copy_images(run_dir: str) -> None:
-    dst = os.path.join(run_dir, "images")
-    if os.path.isdir(STATIC_IMAGES_DIR):
-        shutil.copytree(STATIC_IMAGES_DIR, dst, dirs_exist_ok=True)
+def _copy_static(run_dir: str) -> None:
+    """Copy the static assets into the run folder.
+ 
+        static/report.css  ->  <run>/css/report.css
+        static/report.js   ->  <run>/js/report.js
+        static/images/     ->  <run>/images/
+ 
+    The older layout (static/css/report.css, static/js/report.js) is still accepted.
+    """
+    for fname, sub in (("report.css", "css"), ("report.js", "js")):
+        src = os.path.join(STATIC_DIR, fname)
+        if not os.path.exists(src):
+            src = os.path.join(STATIC_DIR, sub, fname)          # older layout
+        if os.path.exists(src):
+            os.makedirs(os.path.join(run_dir, sub), exist_ok=True)
+            shutil.copy2(src, os.path.join(run_dir, sub, fname))
+        else:
+            print(f"⚠️  static file not found: static/{fname}")
+ 
+    images = os.path.join(STATIC_DIR, "images")
+    if os.path.isdir(images):
+        shutil.copytree(images, os.path.join(run_dir, "images"), dirs_exist_ok=True)
     else:
-        print(f"⚠️  static images folder not found: {STATIC_IMAGES_DIR}")
+        print(f"⚠️  static folder not found: {images}")
  
  
 # ══════════════════════════════════════════════════════════════════════════════
@@ -338,7 +360,8 @@ def generate_report(data: dict, run_dir: str) -> str:
     # ── data files: JSONL + shards, one set per entity ───────────────────────
     entities = [_entity_view(e, data, run_dir) for e in ENTITY_LABELS]
  
-    manifest: Dict[str, Any] = {"page_size": PAGE_SIZE, "shard_size": SHARD_SIZE, "datasets": {}}
+    manifest: Dict[str, Any] = {"page_size": PAGE_SIZE, "shard_size": SHARD_SIZE,
+                                "search_cap": SEARCH_CAP, "datasets": {}}
     for ev in entities:
         for kind in ("missing", "extra", "empty"):
             ds = ev[kind]
@@ -383,28 +406,25 @@ def generate_report(data: dict, run_dir: str) -> str:
     }
     coll, coll_error = _collection_view(data)
  
-    # ── render templates ─────────────────────────────────────────────────────
+    # ── render the HTML page (Jinja) ─────────────────────────────────────────
     env = _jinja_env()
     context = {
-        "environment": data.get("environment", "Prod"),
+        "environment":  data.get("environment", "Prod"),
+        "region_label": data.get("region_label"),
         "generated_at": now.strftime("%d %b %Y, %H:%M:%S"),
         "year": now.year,
-        "theme": THEME,
         "coll": coll, "coll_error": coll_error,
         "stats": stats, "summary_rows": summary_rows, "tests": tests,
         "entities": entities,
     }
     report_path = os.path.join(run_dir, "report.html")
     _write_text(report_path, env.get_template("report.html.j2").render(**context))
-    _write_text(os.path.join(run_dir, "css", "report.css"),
-                env.get_template("report.css.j2").render(t=THEME))
-    _write_text(os.path.join(run_dir, "js", "report.js"),
-                env.get_template("report.js.j2").render(
-                    page_size=PAGE_SIZE, shard_size=SHARD_SIZE, search_cap=SEARCH_CAP))
+ 
+    # ── static CSS / JS / images, copied untouched; dataset index is data ────
+    _copy_static(run_dir)
     _write_text(os.path.join(run_dir, "js", "manifest.js"),
                 "window.REPORT_MANIFEST = " + json.dumps(manifest, separators=(",", ":")) + ";\n")
  
-    _copy_images(run_dir)
     return report_path
  
  

@@ -3,17 +3,18 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Purview ↔ Snowflake Validator — {{ environment }}</title>
+  <title>Purview ↔ Snowflake Validator — {{ region_label or environment }}</title>
   <link rel="icon" type="image/svg+xml" href="images/favicon.svg"/>
   <link rel="stylesheet" href="css/report.css"/>
 </head>
 <body>
 
-{# ── Macro: one lazily-loaded, paged dataset section ─────────────────────── #}
-{% macro dataset(ds, title, colour, ok_msg) %}
+{# ── Macro: one lazily-loaded, paged dataset section ───────────────────────
+   kind is one of: err | accent | blue  (styled in static/css/report.css) #}
+{% macro dataset(ds, title, kind, ok_msg) %}
   {% if ds and ds.count %}
-  <details class="collapsible" data-dataset="{{ ds.name }}">
-    <summary style="border-left:4px solid {{ colour }};">{{ title }}&nbsp;({{ ds.count|num }})</summary>
+  <details class="collapsible kind-{{ kind }}" data-dataset="{{ ds.name }}">
+    <summary>{{ title }}&nbsp;({{ ds.count|num }})</summary>
     <div class="collapsible-body">
       <div class="ds-toolbar">
         <input type="search" class="ds-search" placeholder="Filter all {{ ds.count|num }} rows…" aria-label="Filter rows"/>
@@ -42,6 +43,7 @@
     </div>
   </div>
   <div class="meta">
+    {% if region_label %}Region: <strong>{{ region_label }}</strong><br/>{% endif %}
     Environment: <strong>{{ environment }}</strong><br/>
     Generated: {{ generated_at }}
   </div>
@@ -61,10 +63,9 @@
     <div class="tab-pane active" id="tab-overview">
 
       {% if coll %}
-      {% set ec = theme.env_colours.get(coll.environment, theme.env_default) %}
-      <div class="coll-card" style="border-top:5px solid {{ ec[0] }};">
-        <div class="coll-card-head" style="background:{{ ec[1] }};">
-          <span class="env-badge" style="background:{{ ec[0] }};">{{ (coll.environment or '')|upper }}</span>
+      <div class="coll-card env-{{ coll.env_class }}">
+        <div class="coll-card-head">
+          <span class="env-badge">{{ (coll.environment or '')|upper }}</span>
           <strong class="coll-title">{{ coll.path or coll.name }}</strong>
         </div>
         <div class="coll-card-body">
@@ -100,23 +101,20 @@
       {% endif %}
 
       <div class="stat-row">
-        <div class="stat-card" style="border-top:4px solid {{ theme.text }};background:{{ theme.bg }};">
-          <div class="stat-val" style="color:{{ theme.text }};">{{ stats.total }}</div><div class="stat-lbl">Total Tests</div></div>
-        <div class="stat-card" style="border-top:4px solid {{ theme.success }};background:{{ theme.ok_bg }};">
-          <div class="stat-val" style="color:{{ theme.success }};">{{ stats.passed }}</div><div class="stat-lbl">Passed</div></div>
-        <div class="stat-card" style="border-top:4px solid {{ theme.error }};background:{{ theme.err_bg }};">
-          <div class="stat-val" style="color:{{ theme.error }};">{{ stats.failed }}</div><div class="stat-lbl">Failed</div></div>
-        <div class="stat-card" style="border-top:4px solid {{ theme.muted }};background:#F0F0F0;">
-          <div class="stat-val" style="color:{{ theme.muted }};">{{ stats.skipped }}</div><div class="stat-lbl">Skipped</div></div>
+        <div class="stat-card stat-total"><div class="stat-val">{{ stats.total }}</div><div class="stat-lbl">Total Tests</div></div>
+        <div class="stat-card stat-pass"><div class="stat-val">{{ stats.passed }}</div><div class="stat-lbl">Passed</div></div>
+        <div class="stat-card stat-fail"><div class="stat-val">{{ stats.failed }}</div><div class="stat-lbl">Failed</div></div>
+        <div class="stat-card stat-skip"><div class="stat-val">{{ stats.skipped }}</div><div class="stat-lbl">Skipped</div></div>
       </div>
 
       <p class="run-line">
+        {% if region_label %}Region: <strong>{{ region_label }}</strong> &nbsp;|&nbsp; {% endif %}
         Environment: <strong>{{ environment }}</strong>
         &nbsp;|&nbsp; Duration: <strong>{{ '%.1f'|format(stats.duration) }} s</strong>
       </p>
 
       <h3 class="section-h3">Extraction Summary</h3>
-      <div style="overflow-x:auto;">
+      <div class="scroll-x">
         <table class="vt-table">
           <thead><tr>
             <th>Entity</th><th>Snowflake Count</th><th>Purview Count</th>
@@ -137,7 +135,7 @@
       <p class="row-count">{{ summary_rows|length }} row(s)</p>
 
       <h3 class="section-h3">Test Results</h3>
-      <div style="overflow-x:auto;">
+      <div class="scroll-x">
         <table class="vt-table">
           <thead><tr><th>Test Name</th><th>Outcome</th><th>Duration</th><th>Details</th></tr></thead>
           <tbody>
@@ -175,21 +173,20 @@
           Check console — a connection or extraction error may have caused early exit.
         </div>
       {% else %}
-        {% set sc = theme.success if e.in_sync else theme.error %}
-        <div class="entity-banner" style="border-left:5px solid {{ sc }};">
-          <strong style="color:{{ sc }};">{{ '✅ PASS — Sets are equal' if e.in_sync else '❌ FAIL — Mismatch detected' }}</strong><br/>
+        <div class="entity-banner {{ 'is-ok' if e.in_sync else 'is-bad' }}">
+          <strong class="{{ 'c-ok' if e.in_sync else 'c-err' }}">{{ '✅ PASS — Sets are equal' if e.in_sync else '❌ FAIL — Mismatch detected' }}</strong><br/>
           Snowflake: <strong>{{ e.sf|num }}</strong>
           &nbsp;|&nbsp; Purview: <strong>{{ e.pv|num }}</strong>
-          &nbsp;|&nbsp; Missing from Purview: <strong style="color:{{ theme.error if e.missing_n else theme.success }};">{{ e.missing_n|num }}</strong>
-          &nbsp;|&nbsp; Extra in Purview: <strong style="color:{{ theme.error if e.extra_n else theme.success }};">{{ e.extra_n|num }}</strong>
-          &nbsp;|&nbsp; Empty description: <strong style="color:{{ theme.accent if e.empty_n else theme.success }};">{{ e.empty_n|num }}</strong>
+          &nbsp;|&nbsp; Missing from Purview: <strong class="{{ 'c-err' if e.missing_n else 'c-ok' }}">{{ e.missing_n|num }}</strong>
+          &nbsp;|&nbsp; Extra in Purview: <strong class="{{ 'c-err' if e.extra_n else 'c-ok' }}">{{ e.extra_n|num }}</strong>
+          &nbsp;|&nbsp; Empty description: <strong class="{{ 'c-accent' if e.empty_n else 'c-ok' }}">{{ e.empty_n|num }}</strong>
         </div>
 
-        {{ dataset(e.missing, '⬇️ In Snowflake — NOT in Purview', theme.error,
+        {{ dataset(e.missing, '⬇️ In Snowflake — NOT in Purview', 'err',
                    'All ' ~ e.label|lower ~ ' are present in Purview.') }}
-        {{ dataset(e.extra, '⬆️ In Purview — NOT in Snowflake', theme.accent,
+        {{ dataset(e.extra, '⬆️ In Purview — NOT in Snowflake', 'accent',
                    'No extra ' ~ e.label|lower ~ ' in Purview.') }}
-        {{ dataset(e.empty, '📝 Empty Description in Purview', theme.blue,
+        {{ dataset(e.empty, '📝 Empty Description in Purview', 'blue',
                    'All ' ~ e.label|lower ~ ' have descriptions in Purview.') }}
       {% endif %}
     </div>

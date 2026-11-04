@@ -1,10 +1,12 @@
-/* Generated from templates/report.js.j2 — edit the template, not this file.
+/* Purview ↔ Snowflake Validator — report behaviour (plain JavaScript, no templating).
  *
  * Large datasets (missing / extra / empty-description rows) are NOT in the HTML.
  * They are stored as small "shard" scripts (js/data/<name>.NNNNN.js). A shard is
  * loaded only when needed, one at a time, so the browser never holds the full
  * dataset in memory. Shards are plain <script> files, so this also works when
  * report.html is opened straight from disk (file://), where fetch() is blocked.
+ *
+ * Paging sizes come from js/manifest.js (written by the report generator).
  */
 function showTab(id) {
   document.querySelectorAll('.tab-pane').forEach(function (p) { p.classList.remove('active'); });
@@ -12,23 +14,23 @@ function showTab(id) {
   document.getElementById(id).classList.add('active');
   document.querySelector('[data-tab="' + id + '"]').classList.add('active');
 }
-
+ 
 (function () {
   'use strict';
-
+ 
   var M = window.REPORT_MANIFEST || { datasets: {} };
-  var PAGE_SIZE  = M.page_size  || {{ page_size }};
-  var SHARD_SIZE = M.shard_size || {{ shard_size }};
-  var SEARCH_CAP = {{ search_cap }};
+  var PAGE_SIZE  = M.page_size  || 100;
+  var SHARD_SIZE = M.shard_size || 2000;
+  var SEARCH_CAP = M.search_cap || 5000;
   var pending = {};
-
+ 
   // Each shard file calls this with its rows.
   window.__rpt_cb = function (name, idx, rows) {
     var key = name + ':' + idx;
     var resolve = pending[key];
     if (resolve) { delete pending[key]; resolve(rows); }
   };
-
+ 
   function esc(v) {
     return String(v == null ? '' : v)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -36,7 +38,7 @@ function showTab(id) {
   }
   function fmt(n) { return Number(n).toLocaleString(); }
   function pad(n) { var s = String(n); while (s.length < 5) { s = '0' + s; } return s; }
-
+ 
   function loadShard(ds, idx) {
     return new Promise(function (resolve, reject) {
       var key = ds.name + ':' + idx;
@@ -52,7 +54,7 @@ function showTab(id) {
       document.head.appendChild(s);
     });
   }
-
+ 
   function Viewer(root, ds) {
     var self = this;
     this.root = root;
@@ -69,7 +71,7 @@ function showTab(id) {
     this.prev   = root.querySelector('.ds-prev');
     this.next   = root.querySelector('.ds-next');
     this.search = root.querySelector('.ds-search');
-
+ 
     this.prev.addEventListener('click', function () { self.show(self.page - 1); });
     this.next.addEventListener('click', function () { self.show(self.page + 1); });
     this.search.addEventListener('input', function () {
@@ -78,26 +80,26 @@ function showTab(id) {
     });
     this.show(0);
   }
-
+ 
   Viewer.prototype.setStatus = function (msg) { this.status.textContent = msg || ''; };
-
+ 
   Viewer.prototype.fail = function (err) {
     this.table.innerHTML = '<div class="err-box">⚠️ ' + esc(err.message) +
       '<br/>Keep the whole report folder together (js/data/ must sit next to report.html).</div>';
     this.setStatus('');
   };
-
+ 
   Viewer.prototype.total = function () {
     return this.matches ? this.matches.length : this.ds.count;
   };
-
+ 
   Viewer.prototype.getShard = async function (idx) {
     if (this.cache.idx === idx) { return this.cache.rows; }
     var rows = await loadShard(this.ds, idx);
     this.cache = { idx: idx, rows: rows };
     return rows;
   };
-
+ 
   Viewer.prototype.show = async function (p) {
     var req = ++this.req;
     var total = this.total();
@@ -119,7 +121,7 @@ function showTab(id) {
     } catch (e) { this.fail(e); return; }
     this.render(rows, start, total, pages);
   };
-
+ 
   Viewer.prototype.runSearch = async function (q) {
     q = (q || '').trim().toLowerCase();
     var sreq = ++this.sreq;
@@ -150,12 +152,12 @@ function showTab(id) {
       (capped ? ' — first ' + fmt(SEARCH_CAP) + ' shown, refine the filter' : ''));
     this.show(0);
   };
-
+ 
   Viewer.prototype.render = function (rows, start, total, pages) {
     if (!rows.length) {
       this.table.innerHTML = '<div class="ok-box">No matching rows.</div>';
     } else {
-      var h = '<div style="overflow-x:auto;"><table class="vt-table"><thead><tr><th>#</th>';
+      var h = '<div class="scroll-x"><table class="vt-table"><thead><tr><th>#</th>';
       this.ds.headers.forEach(function (x) { h += '<th>' + esc(x) + '</th>'; });
       h += '</tr></thead><tbody>';
       rows.forEach(function (r, i) {
@@ -173,7 +175,7 @@ function showTab(id) {
     this.prev.disabled = this.page <= 0;
     this.next.disabled = this.page >= pages - 1;
   };
-
+ 
   // A dataset is initialised the first time its <details> section is opened.
   document.querySelectorAll('details[data-dataset]').forEach(function (d) {
     d.addEventListener('toggle', function () {

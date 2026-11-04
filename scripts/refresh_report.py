@@ -6,12 +6,16 @@ Re-renders a report folder from the JSONL files already on disk
  
 Run from the project root:
  
-    python scripts/refresh_report.py                 # re-render the latest run folder
-    python scripts/refresh_report.py --new           # write a NEW timestamped folder
-    python scripts/refresh_report.py --run reports/SnowflakeMsPurview-20261104_121500
+    python scripts/refresh_report.py                  # re-render the latest run folder
+    python scripts/refresh_report.py --region eu      # latest run of one region
+    python scripts/refresh_report.py --new            # write a NEW timestamped folder
+    python scripts/refresh_report.py --run reports/SnowflakeMsPurview-EU-20261104_121500
+ 
+Note: data/ holds the data of the LAST pytest run only (one region). Refresh that
+region's report; to rebuild the other region, run its validation again.
  
 Use this when:
-  - You change a Jinja template (templates/*.j2) and want to see the result immediately
+  - You change templates/report.html.j2 or static/css|js and want to see the result
   - You want to rebuild the report after a completed pytest run
   - CI uploads the data snapshot and you want to rebuild the report locally
  
@@ -43,6 +47,7 @@ _REPORTS_DIR = "reports"
 def main() -> None:
     parser = argparse.ArgumentParser(description="Re-render the validation report.")
     parser.add_argument("--run", help="Existing run folder to re-render (default: latest).")
+    parser.add_argument("--region", help="Use the latest run of this region (e.g. us, eu).")
     parser.add_argument("--new", action="store_true",
                         help="Create a new timestamped folder instead of overwriting.")
     args = parser.parse_args()
@@ -58,7 +63,8 @@ def main() -> None:
         sys.exit(1)
  
     # Which run folder do we read test results from / write into?
-    source_dir = args.run or find_latest_run_dir(_REPORTS_DIR)
+    tag = args.region.upper() if args.region else None
+    source_dir = args.run or find_latest_run_dir(_REPORTS_DIR, tag=tag)
  
     test_results, meta = [], {}
     if source_dir and os.path.isdir(source_dir):
@@ -69,7 +75,8 @@ def main() -> None:
         print("Run pytest at least once to populate test results.")
  
     env = meta.get("environment") or os.environ.get("ENVIRONMENT", "Prod")
-    print(f"Building report for environment: {env}")
+    region = meta.get("region") or (args.region.lower() if args.region else None)
+    print(f"Building report for environment: {env}" + (f", region: {region}" if region else ""))
     print(f"  Reading Snowflake data from : {actual_dir}/")
     print(f"  Reading Purview data from   : {expected_dir}/")
  
@@ -81,6 +88,8 @@ def main() -> None:
         actual_dir   = actual_dir,
         expected_dir = expected_dir,
     )
+    report_data["region"]       = region
+    report_data["region_label"] = meta.get("region_label")
  
     # Print summary
     print("\nExtraction counts (from JSONL files):")
@@ -94,7 +103,7 @@ def main() -> None:
         print(f"  {entity:<20} SF={sf:>8,}  PV={pv:>8,}  {status}")
  
     if args.new or not source_dir or not os.path.isdir(source_dir):
-        run_dir = create_run_dir(_REPORTS_DIR)
+        run_dir = create_run_dir(_REPORTS_DIR, tag=region.upper() if region else None)
     else:
         run_dir = source_dir
  

@@ -1,0 +1,37 @@
+{
+  "_comment": "Databases validated per region. Replace the placeholder names with the real database names. Matching is case-insensitive.",
+  "regions": {
+    "us": {
+      "label": "US NonProd",
+      "environment": "NonProd",
+      "databases": [
+        "US_DB_1",
+        "US_DB_2",
+        "US_DB_3"
+      ]
+    },
+    "eu": {
+      "label": "EU NonProd",
+      "environment": "NonProd",
+      "databases": [
+        "EU_DB_1",
+        "EU_DB_2",
+        "EU_DB_3",
+        "EU_DB_4",
+        "EU_DB_5",
+        "EU_DB_6",
+        "EU_DB_7",
+        "EU_DB_8",
+        "EU_DB_9",
+        "EU_DB_10",
+        "EU_DB_11",
+        "EU_DB_12",
+        "EU_DB_13",
+        "EU_DB_14",
+        "EU_DB_15",
+        "EU_DB_16",
+        "EU_DB_17"
+      ]
+    }
+  }
+}

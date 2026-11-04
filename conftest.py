@@ -10,28 +10,51 @@ fails, pytest.exit() is called immediately and no test runs.
  
 Snowflake authentication uses key-pair (SNOWFLAKE_PRIVATE_KEY_PATH).
  
+Regions (US NonProd / EU NonProd)
+---------------------------------
+config/regions.json lists the databases per region. One pytest run validates ONE
+region:
+ 
+    pytest --region us
+    pytest --region eu
+    python scripts/run_validation.py          # every region, one after another
+ 
+Settings that differ per region can be given in .env with a region suffix, e.g.
+SNOWFLAKE_ACCOUNT_EU, DOMAIN_NAME_EU (see utils/region_config.py). Without
+config/regions.json the validator behaves as before (optionally limited by
+VALIDATE_DATABASES in .env).
+ 
+Live progress
+-------------
+pytest normally captures everything printed inside a fixture and only shows it at
+the end. _log() suspends capture for each write, so the progress lines below
+appear immediately while the (long) extraction runs.
+ 
 Execution order
 ---------------
 1. clear_results        — wipes and re-creates data/ directories
 2. extract_all_data     — establishes connections (exit on failure),
                           extracts all 6 entity types from both sources,
-                          then extracts Commercial collection metadata for
-                          PURVIEW_COLLECTION from .env (informational — never aborts)
+                          trims both sides to the region's databases,
+                          then extracts collection metadata (informational)
 3. Tests run            — pure comparison assertions, no cloud calls
 4. pytest_sessionfinish — reads JSONL/JSON files → computes diffs + empty-desc
-                          → writes reports/SnowflakeMsPurview-<timestamp>/ (HTML, CSS, JS,
-                          images, JSONL) rendered from Jinja templates
+                          → writes reports/SnowflakeMsPurview-<REGION>-<timestamp>/
 """
  
+import json
 import os
+import re
 import shutil
 import time
+from typing import List, Optional
  
 import pytest
 from dotenv import load_dotenv
  
 from clients.purview_client import PurviewClient
 from clients.snowflake_client import SnowflakeClient
+from utils.region_config import get_setting, load_regions, select_region
  
 load_dotenv()
  
@@ -47,10 +70,38 @@ _SESSION: dict = {
     "test_results": [],
 }
  
+# ── region state, filled in by pytest_configure ───────────────────────────────
+_RUN: dict = {
+    "regions":   {},     # everything in config/regions.json
+    "key":       None,   # the region this run validates ("us" / "eu" / None)
+    "label":     None,   # e.g. "EU NonProd"
+    "databases": [],     # databases to keep
+}
+_STATE: dict = {"config": None}
+ 
  
 # ── helpers ───────────────────────────────────────────────────────────────────
  
 def _log(msg: str) -> None:
+    """Print right now, even though pytest is capturing output.
+ 
+    Without this, everything printed from a fixture stays hidden until the whole
+    run (10+ minutes here) is over.
+    """
+    capman = None
+    cfg = _STATE["config"]
+    if cfg is not None:
+        try:
+            capman = cfg.pluginmanager.get_plugin("capturemanager")
+        except Exception:
+            capman = None
+    if capman is not None:
+        try:
+            with capman.global_and_fixture_disabled():
+                print(msg, flush=True)
+            return
+        except Exception:
+            pass
     print(msg, flush=True)
  
  
@@ -70,43 +121,108 @@ def _abort(reason: str, sf=None, pv=None) -> None:
     )
  
  
+def _setting(name: str) -> Optional[str]:
+    """Env value for *name*, preferring NAME_<REGION> (e.g. SNOWFLAKE_ACCOUNT_EU)."""
+    return get_setting(name, _RUN["key"])
+ 
+ 
+def _need(name: str) -> str:
+    value = _setting(name)
+    if not value:
+        hint = f" (or {name}_{_RUN['key'].upper()})" if _RUN["key"] else ""
+        raise RuntimeError(f"Missing setting {name}{hint} in .env")
+    return value
+ 
+ 
+def _databases_to_validate() -> List[str]:
+    """Region databases from config/regions.json, else VALIDATE_DATABASES from .env."""
+    if _RUN["databases"]:
+        return _RUN["databases"]
+    return [d.strip() for d in os.environ.get("VALIDATE_DATABASES", "").split(",") if d.strip()]
+ 
+ 
 def _create_snowflake_client() -> SnowflakeClient:
     extra_raw = os.environ.get("SNOWFLAKE_EXCLUDE_DATABASES", "")
     extra = [db.strip() for db in extra_raw.split(",") if db.strip()]
     return SnowflakeClient(
-        account=os.environ["SNOWFLAKE_ACCOUNT"],
-        user=os.environ["SNOWFLAKE_USER"],
-        private_key_path=os.environ["SNOWFLAKE_PRIVATE_KEY_PATH"],
-        private_key_passphrase=os.environ.get("SNOWFLAKE_PRIVATE_KEY_PASSPHRASE") or None,
-        warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE") or None,
-        database=os.environ.get("SNOWFLAKE_DATABASE") or None,
-        role=os.environ.get("SNOWFLAKE_ROLE", "ACCOUNTADMIN"),
+        account=_need("SNOWFLAKE_ACCOUNT"),
+        user=_need("SNOWFLAKE_USER"),
+        private_key_path=_need("SNOWFLAKE_PRIVATE_KEY_PATH"),
+        private_key_passphrase=_setting("SNOWFLAKE_PRIVATE_KEY_PASSPHRASE") or None,
+        warehouse=_setting("SNOWFLAKE_WAREHOUSE") or None,
+        database=_setting("SNOWFLAKE_DATABASE") or None,
+        role=_setting("SNOWFLAKE_ROLE") or "ACCOUNTADMIN",
         exclude_databases=extra,
     )
  
  
 def _purview_collection() -> str:
-    """Parent collection to validate (e.g. Prod).
+    """Parent collection to validate (e.g. NonProd).
  
-    Read from PURVIEW_COLLECTION in .env; falls back to ENVIRONMENT, then "Prod".
+    PURVIEW_COLLECTION (or PURVIEW_COLLECTION_<REGION>) wins; otherwise the
+    region's "environment" from regions.json, then ENVIRONMENT, then "Prod".
     """
-    return (
-        os.environ.get("PURVIEW_COLLECTION")
-        or os.environ.get("ENVIRONMENT")
-        or "Prod"
-    ).strip()
+    return (_setting("PURVIEW_COLLECTION") or _SESSION["environment"] or "Prod").strip()
  
  
 def _create_purview_client() -> PurviewClient:
     return PurviewClient(
-        account_name=os.environ["PURVIEW_ACCOUNT_NAME"],
-        tenant_id=os.environ["AZURE_TENANT_ID"],
-        client_id=os.environ["AZURE_CLIENT_ID"],
-        client_secret=os.environ["AZURE_CLIENT_SECRET"],
-        domain_name=os.environ["DOMAIN_NAME"],
+        account_name=_need("PURVIEW_ACCOUNT_NAME"),
+        tenant_id=_need("AZURE_TENANT_ID"),
+        client_id=_need("AZURE_CLIENT_ID"),
+        client_secret=_need("AZURE_CLIENT_SECRET"),
+        domain_name=_need("DOMAIN_NAME"),
         collection_prod=_purview_collection(),
-        collection_commercial=os.environ.get("PURVIEW_COLLECTION_COMMERCIAL", "Commercial"),
+        collection_commercial=_setting("PURVIEW_COLLECTION_COMMERCIAL") or "Commercial",
     )
+ 
+ 
+# ── optional: validate only a chosen set of databases ─────────────────────────
+ 
+_DB_KEYS = ("DATABASE_NAME", "TABLE_CATALOG", "PROCEDURE_CATALOG", "CATALOG_NAME", "database_name")
+_DB_IN_QN = re.compile(r"/databases/([^/]+)", re.IGNORECASE)
+ 
+ 
+def _record_db(rec: dict, is_db_file: bool) -> Optional[str]:
+    """Database a record belongs to (upper-case), or None if it can't be told."""
+    for k in _DB_KEYS:
+        if rec.get(k):
+            return str(rec[k]).upper()
+    m = _DB_IN_QN.search(rec.get("qualifiedName") or "")
+    if m:
+        return m.group(1).upper()
+    if is_db_file and rec.get("name"):
+        return str(rec["name"]).upper()
+    return None
+ 
+ 
+def _filter_to_databases(names: List[str], actual_dir: str = _ACTUAL_DIR,
+                         expected_dir: str = _EXPECTED_DIR) -> None:
+    """Rewrite every .jsonl under data/actual and data/expected, keeping only
+    records that belong to the given databases (both Snowflake and Purview sides)."""
+    keep = {n.strip().upper() for n in names if n.strip()}
+    if not keep:
+        return
+    _log(f"\n[FILTER]   Keeping only {len(keep)} database(s): {', '.join(sorted(keep))}")
+    for root in (actual_dir, expected_dir):
+        kept_total = seen_total = 0
+        for dirpath, _, files in os.walk(root):
+            for fname in files:
+                if not fname.endswith(".jsonl"):
+                    continue
+                path = os.path.join(dirpath, fname)
+                tmp = path + ".tmp"
+                is_db_file = fname in ("databases.jsonl", "purview_databases.jsonl")
+                with open(path, encoding="utf-8") as src, open(tmp, "w", encoding="utf-8") as dst:
+                    for line in src:
+                        if not line.strip():
+                            continue
+                        seen_total += 1
+                        if _record_db(json.loads(line), is_db_file) in keep:
+                            dst.write(line if line.endswith("\n") else line + "\n")
+                            kept_total += 1
+                os.replace(tmp, path)
+        _log(f"           {root}: kept {kept_total:,} of {seen_total:,} records")
  
  
 # ── fixtures ──────────────────────────────────────────────────────────────────
@@ -131,6 +247,13 @@ def extract_all_data(clear_results):
     executed.  Step 5 (collection metadata) is informational: a failure is
     logged and recorded in the JSON, but tests still run.
     """
+    if _RUN["regions"] and not _RUN["key"]:
+        _abort(
+            "Several regions are configured in config/regions.json "
+            f"({', '.join(sorted(_RUN['regions']))}). "
+            "Run with --region <name>, or use: python scripts/run_validation.py"
+        )
+ 
     _SESSION["start_time"] = time.time()
     env = _SESSION["environment"]
     sf  = None
@@ -138,24 +261,28 @@ def extract_all_data(clear_results):
  
     _log(f"\n{'='*60}")
     _log("  PURVIEW ↔ SNOWFLAKE METADATA VALIDATOR")
+    if _RUN["label"]:
+        _log(f"  Region      : {_RUN['label']}  ({len(_RUN['databases'])} database(s))")
     _log(f"  Environment : {env}")
     _log(f"{'='*60}")
  
     # ── Step 1: Connect Snowflake (key-pair auth) ─────────────────────────────
     _log("\n[STEP 1/5] Connecting to Snowflake (key-pair) ...")
+    t = time.time()
     try:
         sf = _create_snowflake_client()
         sf.get_databases()
-        _log("           ✅  Snowflake OK")
+        _log(f"           ✅  Snowflake OK  ({time.time() - t:.1f}s)")
     except Exception as exc:
         _abort(f"Snowflake connection failed: {exc}")
  
     # ── Step 2: Connect Purview ───────────────────────────────────────────────
     _log("\n[STEP 2/5] Connecting to MS Purview ...")
+    t = time.time()
     try:
         pv = _create_purview_client()
         pv._resolve_commercial()
-        _log("           ✅  Purview OK")
+        _log(f"           ✅  Purview OK  ({time.time() - t:.1f}s)")
     except Exception as exc:
         _abort(f"Purview connection failed: {exc}", sf=sf)
  
@@ -171,9 +298,10 @@ def extract_all_data(clear_results):
         ("stored_procedures", sf.extract_all_stored_procedures),
     ]:
         _log(f"           → {label} ...")
+        t = time.time()
         try:
             result = method()
-            _log(f"             ✓ {result['count']:,} records")
+            _log(f"             ✓ {result['count']:,} records  ({time.time() - t:.1f}s)")
         except Exception as exc:
             _abort(f"Snowflake extraction failed ({label}): {exc}", sf=sf, pv=pv)
  
@@ -188,17 +316,24 @@ def extract_all_data(clear_results):
         ("stored_procedures", pv.extract_stored_procedures),
     ]:
         _log(f"           → {label} ...")
+        t = time.time()
         try:
             result = method()
-            _log(f"             ✓ {result['count']:,} records")
+            _log(f"             ✓ {result['count']:,} records  ({time.time() - t:.1f}s)")
         except Exception as exc:
             _abort(f"Purview extraction failed ({label}): {exc}", sf=sf, pv=pv)
+ 
+    # ── Trim both sides to the region's databases (config/regions.json) ───────
+    try:
+        _filter_to_databases(_databases_to_validate())
+    except Exception as exc:
+        _abort(f"Database filter failed: {exc}", sf=sf, pv=pv)
  
     # ── Step 5: Collection metadata for the configured environment (non-fatal) ─
     _log(f"\n[STEP 5/5] Extracting Commercial collection metadata ({_purview_collection()}) ...")
     try:
         result = pv.extract_collection_report(
-            environments=[_purview_collection()],   # PURVIEW_COLLECTION from .env (e.g. Prod)
+            environments=[_purview_collection()],
             out_path=_COLLECTION_REPORT_PATH,
         )
         for col in result["sample"]:
@@ -253,6 +388,9 @@ def pytest_runtest_makereport(item, call):
 def pytest_sessionfinish(session, exitstatus):
     import traceback
  
+    if _SESSION["start_time"] is None:   # extraction never ran (e.g. --collect-only)
+        return
+ 
     _SESSION["end_time"] = time.time()
  
     try:
@@ -265,20 +403,51 @@ def pytest_sessionfinish(session, exitstatus):
             start_time   = _SESSION["start_time"],
             end_time     = _SESSION["end_time"],
         )
+        report_data["region"]       = _RUN["key"]
+        report_data["region_label"] = _RUN["label"]
  
-        # reports/SnowflakeMsPurview-<timestamp>/  — html, css, js, images, jsonl
-        run_dir = create_run_dir("reports")
+        # reports/SnowflakeMsPurview-<REGION>-<timestamp>/  — html, css, js, images, jsonl
+        tag = _RUN["key"].upper() if _RUN["key"] else None
+        run_dir = create_run_dir("reports", tag=tag)
         report_path = generate_report(report_data, run_dir)
-        print(f"\n\U0001f4ca  Report folder → {run_dir}")
-        print(f"    Open → {report_path}")
+        _log(f"\n\U0001f4ca  Report folder → {run_dir}")
+        _log(f"    Open → {report_path}")
     except Exception as exc:
-        print(f"\n⚠️  Report generation failed: {exc}")
+        _log(f"\n⚠️  Report generation failed: {exc}")
         traceback.print_exc()
  
  
-# ── minor hooks ───────────────────────────────────────────────────────────────
+# ── options and minor hooks ───────────────────────────────────────────────────
+ 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--region",
+        action="store",
+        default=None,
+        help="Region to validate: a key from config/regions.json (for example us or eu).",
+    )
+ 
  
 def pytest_configure(config):
+    _STATE["config"] = config
+ 
     for marker in ("comparison", "excluded_objects"):
         config.addinivalue_line("markers", f"{marker}: internal marker")
  
+    try:
+        regions = load_regions()
+        key = select_region(
+            regions,
+            config.getoption("--region") or os.environ.get("VALIDATION_REGION"),
+        )
+    except ValueError as exc:
+        raise pytest.UsageError(str(exc))
+ 
+    _RUN["regions"] = regions
+    _RUN["key"] = key
+    if key:
+        region = regions[key]
+        _RUN["label"] = region["label"]
+        _RUN["databases"] = region["databases"]
+        if region.get("environment"):
+            _SESSION["environment"] = region["environment"]

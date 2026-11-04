@@ -24,3 +24,8 @@ reports/
 
 # macOS
 .DS_Store
+
+# Private keys
+*.p8
+*.pem
+*.key

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Purview ↔ Snowflake Validator — {{ environment }}</title>
+  <link rel="icon" type="image/svg+xml" href="images/favicon.svg"/>
+  <link rel="stylesheet" href="css/report.css"/>
+</head>
+<body>
+
+{# ── Macro: one lazily-loaded, paged dataset section ─────────────────────── #}
+{% macro dataset(ds, title, colour, ok_msg) %}
+  {% if ds and ds.count %}
+  <details class="collapsible" data-dataset="{{ ds.name }}">
+    <summary style="border-left:4px solid {{ colour }};">{{ title }}&nbsp;({{ ds.count|num }})</summary>
+    <div class="collapsible-body">
+      <div class="ds-toolbar">
+        <input type="search" class="ds-search" placeholder="Filter all {{ ds.count|num }} rows…" aria-label="Filter rows"/>
+        <span class="ds-status"></span>
+        <a class="ds-dl" href="jsonl/{{ ds.file }}" download>⬇ {{ ds.file }}</a>
+      </div>
+      <div class="ds-table"></div>
+      <div class="ds-pager">
+        <button type="button" class="ds-prev">◀ Prev</button>
+        <span class="ds-pageinfo"></span>
+        <button type="button" class="ds-next">Next ▶</button>
+      </div>
+    </div>
+  </details>
+  {% else %}
+  <div class="ok-box">✅ {{ ok_msg }}</div>
+  {% endif %}
+{% endmacro %}
+
+<header>
+  <div class="brand">
+    <img class="logo" src="images/logo.svg" alt="Purview to Snowflake"/>
+    <div>
+      <div class="brand-title">Purview &#8596; Snowflake Validator</div>
+      <div class="brand-sub">Metadata drift detection &amp; audit report</div>
+    </div>
+  </div>
+  <div class="meta">
+    Environment: <strong>{{ environment }}</strong><br/>
+    Generated: {{ generated_at }}
+  </div>
+</header>
+
+<div class="container">
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="tab-overview" onclick="showTab('tab-overview')">📊 Overview</button>
+    {% for e in entities %}
+    <button class="tab-btn" data-tab="{{ e.tab_id }}" onclick="showTab('{{ e.tab_id }}')">{{ e.icon }} {{ e.label }}{% if e.mismatch %} <span class="dot" title="Mismatch">●</span>{% endif %}</button>
+    {% endfor %}
+  </div>
+
+  <div class="tab-content">
+
+    {# ═══════════════ OVERVIEW ═══════════════ #}
+    <div class="tab-pane active" id="tab-overview">
+
+      {% if coll %}
+      {% set ec = theme.env_colours.get(coll.environment, theme.env_default) %}
+      <div class="coll-card" style="border-top:5px solid {{ ec[0] }};">
+        <div class="coll-card-head" style="background:{{ ec[1] }};">
+          <span class="env-badge" style="background:{{ ec[0] }};">{{ (coll.environment or '')|upper }}</span>
+          <strong class="coll-title">{{ coll.path or coll.name }}</strong>
+        </div>
+        <div class="coll-card-body">
+          {% if coll.error %}
+          <div class="err-box">⚠️ Could not extract metadata: {{ coll.error }}</div>
+          {% else %}
+          <div class="coll-subhead">Collection Metadata</div>
+          <table class="kv-table"><tbody>
+            <tr><th>Environment</th><td>{{ coll.environment }}</td></tr>
+            <tr><th>Collection Name</th><td>{{ coll.name }}</td></tr>
+            <tr><th>Collection ID</th><td>{{ coll.id }}</td></tr>
+            <tr><th>Collection Path</th><td>
+              <div class="cpath">
+                {% for p in coll.path_parts %}
+                  {% if not loop.first %}<div class="cpath-line"></div>{% endif %}
+                  <div class="cpath-node">
+                    <img class="cpath-icon" src="images/{{ 'icon-root.svg' if loop.first else 'icon-collection.svg' }}" alt=""/>
+                    <span class="cpath-name">{{ p }}</span>
+                  </div>
+                {% else %}—{% endfor %}
+              </div>
+            </td></tr>
+            <tr><th>Created By</th><td>{{ coll.created_by }}</td></tr>
+            <tr><th>Created At</th><td>{{ coll.created_at }}</td></tr>
+            <tr><th>Updated By</th><td>{{ coll.updated_by }}</td></tr>
+            <tr><th>Updated At</th><td>{{ coll.updated_at }}</td></tr>
+          </tbody></table>
+          {% endif %}
+        </div>
+      </div>
+      {% else %}
+      <div class="err-box">⚠️ Collection: {{ coll_error }}</div>
+      {% endif %}
+
+      <div class="stat-row">
+        <div class="stat-card" style="border-top:4px solid {{ theme.text }};background:{{ theme.bg }};">
+          <div class="stat-val" style="color:{{ theme.text }};">{{ stats.total }}</div><div class="stat-lbl">Total Tests</div></div>
+        <div class="stat-card" style="border-top:4px solid {{ theme.success }};background:{{ theme.ok_bg }};">
+          <div class="stat-val" style="color:{{ theme.success }};">{{ stats.passed }}</div><div class="stat-lbl">Passed</div></div>
+        <div class="stat-card" style="border-top:4px solid {{ theme.error }};background:{{ theme.err_bg }};">
+          <div class="stat-val" style="color:{{ theme.error }};">{{ stats.failed }}</div><div class="stat-lbl">Failed</div></div>
+        <div class="stat-card" style="border-top:4px solid {{ theme.muted }};background:#F0F0F0;">
+          <div class="stat-val" style="color:{{ theme.muted }};">{{ stats.skipped }}</div><div class="stat-lbl">Skipped</div></div>
+      </div>
+
+      <p class="run-line">
+        Environment: <strong>{{ environment }}</strong>
+        &nbsp;|&nbsp; Duration: <strong>{{ '%.1f'|format(stats.duration) }} s</strong>
+      </p>
+
+      <h3 class="section-h3">Extraction Summary</h3>
+      <div style="overflow-x:auto;">
+        <table class="vt-table">
+          <thead><tr>
+            <th>Entity</th><th>Snowflake Count</th><th>Purview Count</th>
+            <th>Missing from Purview</th><th>Extra in Purview</th><th>Status</th>
+          </tr></thead>
+          <tbody>
+          {% for r in summary_rows %}
+            <tr>
+              <td>{{ r.icon }} {{ r.label }}</td>
+              <td>{{ r.sf|num }}</td><td>{{ r.pv|num }}</td>
+              <td>{{ r.missing|num }}</td><td>{{ r.extra|num }}</td>
+              <td>{{ r.status }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="row-count">{{ summary_rows|length }} row(s)</p>
+
+      <h3 class="section-h3">Test Results</h3>
+      <div style="overflow-x:auto;">
+        <table class="vt-table">
+          <thead><tr><th>Test Name</th><th>Outcome</th><th>Duration</th><th>Details</th></tr></thead>
+          <tbody>
+          {% for t in tests %}
+            <tr>
+              <td>{{ t.icon }} {{ t.name }}</td>
+              <td>{{ t.outcome|upper }}</td>
+              <td>{{ '%.3f'|format(t.duration) }}s</td>
+              <td>{{ t.message }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="row-count">{{ tests|length }} row(s)</p>
+
+      <p class="run-line">
+        Raw data for this run:
+        <a href="jsonl/summary.jsonl" download>summary.jsonl</a> ·
+        <a href="jsonl/test_results.jsonl" download>test_results.jsonl</a> ·
+        <a href="jsonl/run_meta.jsonl" download>run_meta.jsonl</a>
+      </p>
+    </div>
+
+    {# ═══════════════ ENTITY TABS ═══════════════ #}
+    {% for e in entities %}
+    <div class="tab-pane" id="{{ e.tab_id }}">
+      <h2 class="pane-title">{{ e.icon }} {{ e.label }}</h2>
+
+      {% if e.error %}
+        <div class="err-box">⚠️ Comparison error: {{ e.error }}</div>
+      {% elif not e.has_data %}
+        <div class="entity-banner">
+          <strong>No extraction data available.</strong>
+          Check console — a connection or extraction error may have caused early exit.
+        </div>
+      {% else %}
+        {% set sc = theme.success if e.in_sync else theme.error %}
+        <div class="entity-banner" style="border-left:5px solid {{ sc }};">
+          <strong style="color:{{ sc }};">{{ '✅ PASS — Sets are equal' if e.in_sync else '❌ FAIL — Mismatch detected' }}</strong><br/>
+          Snowflake: <strong>{{ e.sf|num }}</strong>
+          &nbsp;|&nbsp; Purview: <strong>{{ e.pv|num }}</strong>
+          &nbsp;|&nbsp; Missing from Purview: <strong style="color:{{ theme.error if e.missing_n else theme.success }};">{{ e.missing_n|num }}</strong>
+          &nbsp;|&nbsp; Extra in Purview: <strong style="color:{{ theme.error if e.extra_n else theme.success }};">{{ e.extra_n|num }}</strong>
+          &nbsp;|&nbsp; Empty description: <strong style="color:{{ theme.accent if e.empty_n else theme.success }};">{{ e.empty_n|num }}</strong>
+        </div>
+
+        {{ dataset(e.missing, '⬇️ In Snowflake — NOT in Purview', theme.error,
+                   'All ' ~ e.label|lower ~ ' are present in Purview.') }}
+        {{ dataset(e.extra, '⬆️ In Purview — NOT in Snowflake', theme.accent,
+                   'No extra ' ~ e.label|lower ~ ' in Purview.') }}
+        {{ dataset(e.empty, '📝 Empty Description in Purview', theme.blue,
+                   'All ' ~ e.label|lower ~ ' have descriptions in Purview.') }}
+      {% endif %}
+    </div>
+    {% endfor %}
+
+  </div>
+</div>
+
+<footer>
+  &copy; {{ year }} Purview–Snowflake Validator &nbsp;|&nbsp;
+  Open-source metadata validation tool &nbsp;|&nbsp;
+  Report generated {{ generated_at }}
+</footer>
+
+<script src="js/manifest.js"></script>
+<script src="js/report.js"></script>
+</body>
+</html>

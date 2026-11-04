@@ -1,3 +1,4 @@
+
 """
 conftest
 ========
@@ -6,6 +7,8 @@ data/actual/ and data/expected/ BEFORE a single test function is called.
  
 If Snowflake or Purview cannot be reached, or if any entity extraction step
 fails, pytest.exit() is called immediately and no test runs.
+ 
+Snowflake authentication uses key-pair (SNOWFLAKE_PRIVATE_KEY_PATH).
  
 Execution order
 ---------------
@@ -16,7 +19,8 @@ Execution order
                           PURVIEW_COLLECTION from .env (informational — never aborts)
 3. Tests run            — pure comparison assertions, no cloud calls
 4. pytest_sessionfinish — reads JSONL/JSON files → computes diffs + empty-desc
-                          → generates the HTML report
+                          → writes reports/SnowflakeMsPurview-<timestamp>/ (HTML, CSS, JS,
+                          images, JSONL) rendered from Jinja templates
 """
  
 import os
@@ -72,8 +76,10 @@ def _create_snowflake_client() -> SnowflakeClient:
     return SnowflakeClient(
         account=os.environ["SNOWFLAKE_ACCOUNT"],
         user=os.environ["SNOWFLAKE_USER"],
-        password=os.environ["SNOWFLAKE_PASSWORD"],
-        warehouse=os.environ["SNOWFLAKE_WAREHOUSE"],
+        private_key_path=os.environ["SNOWFLAKE_PRIVATE_KEY_PATH"],
+        private_key_passphrase=os.environ.get("SNOWFLAKE_PRIVATE_KEY_PASSPHRASE") or None,
+        warehouse=os.environ.get("SNOWFLAKE_WAREHOUSE") or None,
+        database=os.environ.get("SNOWFLAKE_DATABASE") or None,
         role=os.environ.get("SNOWFLAKE_ROLE", "ACCOUNTADMIN"),
         exclude_databases=extra,
     )
@@ -135,8 +141,8 @@ def extract_all_data(clear_results):
     _log(f"  Environment : {env}")
     _log(f"{'='*60}")
  
-    # ── Step 1: Connect Snowflake ─────────────────────────────────────────────
-    _log("\n[STEP 1/5] Connecting to Snowflake ...")
+    # ── Step 1: Connect Snowflake (key-pair auth) ─────────────────────────────
+    _log("\n[STEP 1/5] Connecting to Snowflake (key-pair) ...")
     try:
         sf = _create_snowflake_client()
         sf.get_databases()
@@ -245,26 +251,13 @@ def pytest_runtest_makereport(item, call):
 # ── session finish: build report from JSONL files → generate HTML ─────────────
  
 def pytest_sessionfinish(session, exitstatus):
-    import json
     import traceback
  
     _SESSION["end_time"] = time.time()
  
     try:
         from utils.report_data_builder import build_report_data
-        from utils.report_generator import generate_report
- 
-        os.makedirs("reports", exist_ok=True)
- 
-        # Persist test results so refresh_report.py can reload them later
-        meta = {
-            "environment":  _SESSION["environment"],
-            "start_time":   _SESSION["start_time"],
-            "end_time":     _SESSION["end_time"],
-            "test_results": _SESSION["test_results"],
-        }
-        with open("reports/test_results.json", "w", encoding="utf-8") as f:
-            json.dump(meta, f, indent=2)
+        from utils.report_generator import create_run_dir, generate_report
  
         report_data = build_report_data(
             environment  = _SESSION["environment"],
@@ -272,8 +265,12 @@ def pytest_sessionfinish(session, exitstatus):
             start_time   = _SESSION["start_time"],
             end_time     = _SESSION["end_time"],
         )
-        generate_report(report_data, "reports/report.html")
-        print("\n\U0001f4ca  Report → reports/report.html")
+ 
+        # reports/SnowflakeMsPurview-<timestamp>/  — html, css, js, images, jsonl
+        run_dir = create_run_dir("reports")
+        report_path = generate_report(report_data, run_dir)
+        print(f"\n\U0001f4ca  Report folder → {run_dir}")
+        print(f"    Open → {report_path}")
     except Exception as exc:
         print(f"\n⚠️  Report generation failed: {exc}")
         traceback.print_exc()

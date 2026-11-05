@@ -96,40 +96,28 @@ class SnowflakeClient:
         exclude_databases: Optional[List[str]] = None,
         host: Optional[str] = None,
     ):
- 
+
         private_key = self._load_private_key(
             private_key_path,
             private_key_passphrase,
         )
- 
+
         params: Dict[str, Any] = {
             "account": account,
             "user": user,
             "private_key": private_key,
             "authenticator": "SNOWFLAKE_JWT",
         }
- 
-        # PrivateLink / custom host (kept separate from the account identifier)
+
         if host:
             params["host"] = host
- 
         if warehouse:
             params["warehouse"] = warehouse
- 
         if database:
             params["database"] = database
- 
         if role:
             params["role"] = role
- 
-        logger.info(
-            "Connecting to Snowflake: account=%s user=%s host=%s role=%s",
-            account,
-            user,
-            host or "(default)",
-            role or "(default)",
-        )
- 
+
         self._conn = snowflake.connector.connect(**params)
  
         extra = {

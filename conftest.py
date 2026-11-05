@@ -1,4 +1,3 @@
-
 """
 conftest
 ========
@@ -30,6 +29,9 @@ pytest normally captures everything printed inside a fixture and only shows it a
 the end. _log() suspends capture for each write, so the progress lines below
 appear immediately while the (long) extraction runs.
  
+_heartbeat() prints a "still running" line every 15 seconds during slow steps
+(for example the columns extraction) so the run never looks frozen.
+ 
 Execution order
 ---------------
 1. clear_results        — wipes and re-creates data/ directories
@@ -46,7 +48,9 @@ import json
 import os
 import re
 import shutil
+import threading
 import time
+from contextlib import contextmanager
 from typing import List, Optional
  
 import pytest
@@ -82,6 +86,25 @@ _STATE: dict = {"config": None}
  
 # ── helpers ───────────────────────────────────────────────────────────────────
  
+_ASCII = {
+    "↔": "<->",
+    "→": "->",
+    "✓": "OK",
+    "✅": "OK",
+    "❌": "X",
+    "⚠️": "!",
+    "—": "-",
+    "\U0001f4ca": "[REPORT]",
+}
+ 
+ 
+def _ascii(msg: str) -> str:
+    """Swap special symbols for plain ASCII so any Windows console shows them."""
+    for k, v in _ASCII.items():
+        msg = msg.replace(k, v)
+    return msg
+ 
+ 
 def _log(msg: str) -> None:
     """Print right now, even though pytest is capturing output.
  
@@ -98,11 +121,28 @@ def _log(msg: str) -> None:
     if capman is not None:
         try:
             with capman.global_and_fixture_disabled():
-                print(msg, flush=True)
+                print(_ascii(msg), flush=True)
             return
         except Exception:
             pass
-    print(msg, flush=True)
+    print(_ascii(msg), flush=True)
+ 
+ 
+@contextmanager
+def _heartbeat(label: str, interval: int = 15):
+    """Print a 'still running' line every `interval` seconds while a step runs."""
+    stop = threading.Event()
+    t0 = time.time()
+ 
+    def _run():
+        while not stop.wait(interval):
+            _log(f"             ... {label} still running ({int(time.time() - t0)}s)")
+ 
+    threading.Thread(target=_run, daemon=True).start()
+    try:
+        yield
+    finally:
+        stop.set()
  
  
 def _abort(reason: str, sf=None, pv=None) -> None:
@@ -115,7 +155,7 @@ def _abort(reason: str, sf=None, pv=None) -> None:
     except Exception:
         pass
     pytest.exit(
-        f"\n{'='*60}\n❌  ABORTING SESSION — no tests will run.\n"
+        f"\n{'='*60}\nX  ABORTING SESSION - no tests will run.\n"
         f"    Reason: {reason}\n{'='*60}",
         returncode=2,
     )
@@ -153,6 +193,7 @@ def _create_snowflake_client() -> SnowflakeClient:
         database=_setting("SNOWFLAKE_DATABASE") or None,
         role=_setting("SNOWFLAKE_ROLE") or "ACCOUNTADMIN",
         exclude_databases=extra,
+        host=_setting("SNOWFLAKE_HOST") or None,
     )
  
  
@@ -163,6 +204,34 @@ def _purview_collection() -> str:
     region's "environment" from regions.json, then ENVIRONMENT, then "Prod".
     """
     return (_setting("PURVIEW_COLLECTION") or _SESSION["environment"] or "Prod").strip()
+ 
+ 
+def _region_prefix() -> str:
+    """Prefix put in front of every object name in the report, e.g. US_NonProd."""
+    if not _RUN["key"]:
+        return ""
+    return f"{_RUN['key'].upper()}_{_SESSION['environment']}"
+ 
+ 
+def _collection_tree() -> list:
+    """Collection hierarchy for EVERY region in config/regions.json.
+ 
+    Used by the report to draw one tree (US and EU side by side). A region may set
+    "collection_root" in regions.json (for example "Vantive EU"); otherwise the
+    root is "Vantive <KEY>".
+    """
+    commercial = (_setting("PURVIEW_COLLECTION_COMMERCIAL") or "Commercial").strip()
+    tree = []
+    for key, region in _RUN["regions"].items():
+        tree.append({
+            "key":         key.upper(),
+            "label":       region.get("label") or key.upper(),
+            "root":        region.get("collection_root") or f"Vantive {key.upper()}",
+            "environment": region.get("environment") or "NonProd",
+            "collection":  commercial,
+            "current":     key == _RUN["key"],
+        })
+    return tree
  
  
 def _create_purview_client() -> PurviewClient:
@@ -300,7 +369,8 @@ def extract_all_data(clear_results):
         _log(f"           → {label} ...")
         t = time.time()
         try:
-            result = method()
+            with _heartbeat(f"Snowflake {label}"):
+                result = method()
             _log(f"             ✓ {result['count']:,} records  ({time.time() - t:.1f}s)")
         except Exception as exc:
             _abort(f"Snowflake extraction failed ({label}): {exc}", sf=sf, pv=pv)
@@ -318,7 +388,8 @@ def extract_all_data(clear_results):
         _log(f"           → {label} ...")
         t = time.time()
         try:
-            result = method()
+            with _heartbeat(f"Purview {label}"):
+                result = method()
             _log(f"             ✓ {result['count']:,} records  ({time.time() - t:.1f}s)")
         except Exception as exc:
             _abort(f"Purview extraction failed ({label}): {exc}", sf=sf, pv=pv)
@@ -402,9 +473,11 @@ def pytest_sessionfinish(session, exitstatus):
             test_results = _SESSION["test_results"],
             start_time   = _SESSION["start_time"],
             end_time     = _SESSION["end_time"],
+            prefix       = _region_prefix(),
         )
         report_data["region"]       = _RUN["key"]
         report_data["region_label"] = _RUN["label"]
+        report_data["collection_tree"] = _collection_tree()
  
         # reports/SnowflakeMsPurview-<REGION>-<timestamp>/  — html, css, js, images, jsonl
         tag = _RUN["key"].upper() if _RUN["key"] else None

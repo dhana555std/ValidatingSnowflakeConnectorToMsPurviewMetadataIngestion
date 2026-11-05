@@ -10,6 +10,19 @@ Used by both:
 All counts are derived directly from the JSONL files so they always match
 what was actually written during extraction, regardless of what the extraction
 methods reported at runtime.
+ 
+Region prefix
+-------------
+When a `prefix` such as "US_NonProd" or "EU_NonProd" is passed, every object
+name shown in the report is prefixed with it:
+ 
+    US_NonProd.<DB>
+    US_NonProd.<DB>.<SCHEMA>
+    US_NonProd.<DB>.<SCHEMA>.<TABLE>
+ 
+The prefix is applied here, on the report side only. The extracted JSONL files
+and the Snowflake/Purview matching are not changed, so comparison results stay
+exactly the same. Without a prefix, names are shown as before.
 """
  
 import os
@@ -42,6 +55,39 @@ def _count_jsonl_dir(directory: str) -> int:
             if fname.endswith(".jsonl"):
                 total += _count_jsonl(os.path.join(root, fname))
     return total
+ 
+ 
+def _with_prefix(prefix: str, name: str) -> str:
+    """'US_NonProd' + 'DB.SCHEMA' -> 'US_NonProd.DB.SCHEMA' (unchanged when no prefix)."""
+    return f"{prefix}.{name}" if prefix and name else name
+ 
+ 
+def _full_name(entity: str, rec: Dict[str, Any], prefix: str) -> str:
+    """Prefixed, dotted name of a Purview record, built the same way the
+    comparator builds its keys (so names in the report line up with missing/extra)."""
+    key_fns = {
+        "databases":         getattr(cmp, "_pv_db_key", None),
+        "schemas":           getattr(cmp, "_pv_schema_key", None),
+        "tables":            getattr(cmp, "_pv_table_key", None),
+        "views":             getattr(cmp, "_pv_view_key", None),
+        "stored_procedures": getattr(cmp, "_pv_sp_key", None),
+        "columns":           getattr(cmp, "_pv_col_key", None),
+    }
+    fn = key_fns.get(entity)
+    name = fn(rec) if fn else ""
+ 
+    if not name and entity == "columns":
+        parts = [
+            rec.get("database_name", ""),
+            rec.get("schema_name", ""),
+            rec.get("table_name", ""),
+            rec.get("name", ""),
+        ]
+        name = ".".join(str(p).upper() for p in parts if p)
+    if not name:
+        name = str(rec.get("name", "")).upper()
+ 
+    return _with_prefix(prefix, name)
  
  
 def _load_collection_metadata(expected_dir: str) -> Dict[str, Any]:
@@ -99,6 +145,7 @@ def build_report_data(
     end_time: float = None,
     actual_dir: str = _ACTUAL_DIR,
     expected_dir: str = _EXPECTED_DIR,
+    prefix: str = "",
 ) -> Dict[str, Any]:
     """Read JSONL files and return a fully-populated report data dict.
  
@@ -113,12 +160,16 @@ def build_report_data(
         Unix timestamps from the pytest session; set to now when standalone.
     actual_dir / expected_dir:
         Override data directories (useful for tests).
+    prefix:
+        Region prefix such as "US_NonProd" / "EU_NonProd". Put in front of every
+        object name in the report and shown as the report's Account.
     """
     import time as _time
     now = _time.time()
     start_time = start_time if start_time is not None else now
     end_time   = end_time   if end_time   is not None else now
     test_results = test_results or []
+    prefix = (prefix or "").strip()
  
     # ── extraction counts (from JSONL files, not from runtime memory) ─────────
     sf_paths = {
@@ -164,8 +215,8 @@ def build_report_data(
         try:
             missing, extra = fn(actual_dir, expected_dir)
             comparison[entity] = {
-                "missing":  missing,
-                "extra":    extra,
+                "missing":  [_with_prefix(prefix, k) for k in missing],
+                "extra":    [_with_prefix(prefix, k) for k in extra],
                 "sf_count": extraction[f"sf_{entity}"]["count"],
                 "pv_count": extraction[f"pv_{entity}"]["count"],
             }
@@ -173,11 +224,16 @@ def build_report_data(
             comparison[entity] = {"error": str(exc)}
  
     # ── empty descriptions in Purview ─────────────────────────────────────────
+    # "fullName" is the prefixed, dotted name (for example US_NonProd.DB.SCHEMA.TABLE)
     empty_desc: Dict[str, List] = {}
     for entity, path in pv_paths.items():
         records = cmp.load_jsonl(path)
         empty_desc[entity] = [
-            {"name": r.get("name", ""), "qualifiedName": r.get("qualifiedName", "")}
+            {
+                "fullName":      _full_name(entity, r, prefix),
+                "name":          r.get("name", ""),
+                "qualifiedName": r.get("qualifiedName", ""),
+            }
             for r in records
             if not (r.get("description") or "").strip()
         ]
@@ -185,6 +241,7 @@ def build_report_data(
     col_records = cmp.load_jsonl_dir(os.path.join(expected_dir, "columns"))
     empty_desc["columns"] = [
         {
+            "fullName":      _full_name("columns", r, prefix),
             "name":          r.get("name", ""),
             "qualifiedName": r.get("qualifiedName", ""),
             "database_name": r.get("database_name", ""),
@@ -201,6 +258,8 @@ def build_report_data(
  
     return {
         "environment":         environment,
+        "account":             prefix or None,
+        "name_prefix":         prefix,
         "start_time":          start_time,
         "end_time":            end_time,
         "session_failed":      False,
